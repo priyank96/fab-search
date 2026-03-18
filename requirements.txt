@@ -1,6 +1,6 @@
 fastapi>=0.121.0
 uvicorn>=0.34.0
-gradio_client
+requests>=2.31.0
 pinecone>=5.0.0
 pymupdf>=1.24.0
 opencv-python-headless>=4.8.0

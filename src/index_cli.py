@@ -14,6 +14,7 @@ Usage:
     python -m src.index_cli rebuild
 """
 
+import logging
 import os
 import sys
 import glob
@@ -297,4 +298,11 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    # Only show debug logs from the embedding client
+    logging.getLogger("src.embedding_client").setLevel(logging.DEBUG)
     main()
