@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>fab-search</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/" class="logo">fab-search</a>
+            <div class="nav-links">
+                <a href="/" class="active" data-page="search">Search</a>
+                <a href="#catalogs" data-page="catalogs">Catalogs</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Search Page -->
+        <section id="page-search" class="page active">
+            <div class="upload-area" id="upload-area">
+                <input type="file" id="file-input" accept="image/*" capture="environment" hidden>
+                <div class="upload-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                </div>
+                <p class="upload-text">Tap to take a photo or choose an image</p>
+                <p class="upload-hint">JPG, PNG, or WebP</p>
+            </div>
+
+            <div id="preview-container" class="preview-container hidden">
+                <img id="preview-image" alt="Query preview">
+                <button id="clear-btn" class="btn-icon" title="Clear">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="search-controls">
+                <label for="top-k">Results: <span id="top-k-value">5</span></label>
+                <input type="range" id="top-k" min="1" max="20" value="5">
+                <button id="search-btn" class="btn-primary" disabled>Search</button>
+            </div>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Searching catalogs...</p>
+            </div>
+
+            <div id="results" class="results"></div>
+        </section>
+
+        <!-- Catalogs Page -->
+        <section id="page-catalogs" class="page">
+            <h2>Indexed Catalogs</h2>
+            <div id="catalogs-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading catalogs...</p>
+            </div>
+            <div id="catalogs-list" class="catalogs-list"></div>
+            <p id="catalogs-empty" class="empty-state hidden">No catalogs indexed yet. Use the CLI to add catalogs.</p>
+        </section>
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+</html>

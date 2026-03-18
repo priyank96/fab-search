@@ -1,0 +1,385 @@
+/* fab-search — Mobile-first responsive styles */
+
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-hover: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e5e5e5;
+    --text-muted: #888;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --danger: #ef4444;
+    --radius: 12px;
+    --radius-sm: 8px;
+}
+
+html {
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────────── */
+
+header {
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+}
+
+nav {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    gap: 1rem;
+}
+
+.logo {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: auto;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--text-muted);
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.15s, background 0.15s;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+    color: var(--text);
+    background: var(--surface);
+}
+
+/* ── Main ───────────────────────────────────────── */
+
+main {
+    flex: 1;
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.page { display: none; }
+.page.active { display: block; }
+.hidden { display: none !important; }
+
+/* ── Upload area ────────────────────────────────── */
+
+.upload-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 2.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: var(--accent);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.upload-icon {
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.upload-text {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.upload-hint {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+/* ── Preview ────────────────────────────────────── */
+
+.preview-container {
+    position: relative;
+    margin-top: 1rem;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.preview-container img {
+    width: 100%;
+    max-height: 240px;
+    object-fit: contain;
+    display: block;
+}
+
+.btn-icon {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0,0,0,0.6);
+    border: none;
+    color: var(--text);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Search controls ────────────────────────────── */
+
+.search-controls {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.search-controls label {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.search-controls input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Loading ────────────────────────────────────── */
+
+.loading {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--text-muted);
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 0.75rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Results ────────────────────────────────────── */
+
+.results {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+
+.result-card:hover {
+    border-color: #444;
+}
+
+.result-image-wrap {
+    position: relative;
+    background: #000;
+}
+
+.result-image-wrap img {
+    width: 100%;
+    display: block;
+}
+
+.result-image-wrap canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.result-meta {
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.result-meta .label {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.result-meta .value {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.result-rank {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    background: var(--accent);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.result-score {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* ── Catalogs page ──────────────────────────────── */
+
+#page-catalogs h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.catalogs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.catalog-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.catalog-info h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.catalog-info p {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+}
+
+/* ── Tablet+ ────────────────────────────────────── */
+
+@media (min-width: 768px) {
+    main {
+        padding: 2rem 1.5rem;
+    }
+
+    .upload-area {
+        padding: 3rem 2rem;
+    }
+
+    .preview-container img {
+        max-height: 320px;
+    }
+}
