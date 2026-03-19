@@ -49,6 +49,19 @@ def index():
         print(f"{indent}{os.path.basename(dirpath)}/")
         for f in filenames:
             print(f"{indent}  {f}")
+
+    # Also scan /var/task (Vercel serverless function root) and common parent dirs
+    for scan_dir in ["/var/task", "/var", os.path.dirname(_fn_root)]:
+        if os.path.isdir(scan_dir):
+            print(f"\n[fab-search] Scanning: {scan_dir}")
+            for dirpath, dirnames, filenames in os.walk(scan_dir):
+                dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
+                depth = dirpath.replace(scan_dir, '').count(os.sep)
+                indent = '  ' * depth
+                print(f"{indent}{os.path.basename(dirpath)}/")
+                for f in filenames:
+                    print(f"{indent}  {f}")
+
     return FileResponse(os.path.join("./public/", "index.html"))
 
 
