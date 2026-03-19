@@ -26,16 +26,24 @@ def health():
 @app.get("/")
 def index():
     _fn_root = os.path.dirname(os.path.abspath(__file__))
-    print(f"[fab-search] index() root: {_fn_root}")
-    for dirpath, dirnames, filenames in os.walk(_fn_root):
-        dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
-        depth = dirpath.replace(_fn_root, '').count(os.sep)
-        indent = '  ' * depth
-        print(f"{indent}{os.path.basename(dirpath)}/")
-        for f in filenames:
-            print(f"{indent}  {f}")
+    # Check common locations for static/public folders
+    candidates = [
+        os.path.join(_fn_root, "public"),
+        os.path.join(_fn_root, "static"),
+        "/var/task/public",
+        "/var/task/static",
+        "/var/task",
+        "public/",
+        "/public/"
+    ]
+    found = {p: os.path.isdir(p) for p in candidates}
+    print(f"[fab-search] __file__: {os.path.abspath(__file__)}")
+    print(f"[fab-search] root: {_fn_root}")
+    for path, exists in found.items():
+        label = "EXISTS" if exists else "NOT FOUND"
+        print(f"[fab-search] {path}: {label}")
 
-    return {"message": "fab-search is running"}
+    return {"message": "fab-search is running", "root": _fn_root, "paths": found}
 
 
 # app.mount("/", StaticFiles(directory=_public_dir), name="static")
