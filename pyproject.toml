@@ -15,6 +15,3 @@ dependencies = [
   "python-dotenv>=1.0.0",
   "python-multipart>=0.0.20",
 ]
-
-[project.scripts]
-index-cli = "src.index_cli:main"
