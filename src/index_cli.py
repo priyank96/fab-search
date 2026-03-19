@@ -141,6 +141,9 @@ def index_single_pdf(pdf_path: str, store: PineconeStore) -> tuple[int, int, int
 
         pdf_vectors += page_vectors
 
+        # Flush after each page so progress is saved incrementally
+        store.flush()
+
     # Flush remaining vectors to Pinecone
     store.flush()
     return pdf_pages, pdf_regions, pdf_vectors

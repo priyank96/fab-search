@@ -7,16 +7,9 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "main.py"
-    },
-    {
-      "src": "/(.*\\.(js|css|ico|png|jpg|svg|webp|woff2?))",
-      "dest": "public/$1"
-    },
-    {
       "src": "/(.*)",
       "dest": "main.py"
     }
-  ]
+  ],
+  "outputDirectory": "."
 }
