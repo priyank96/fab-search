@@ -28,7 +28,7 @@ def health():
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join("./", "index.html"))
+    return FileResponse(os.path.join("./public/", "index.html"))
 
 
 # app.mount("/", StaticFiles(directory=_public_dir), name="static")
