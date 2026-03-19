@@ -24,18 +24,17 @@ def health():
 
 # Serve static frontend files
 #_public_dir = os.path.join(os.path.dirname(__file__), "public")
-
-# Debug: log directory structure at startup
-_root = os.path.dirname(os.path.abspath(__file__))
-print(f"[fab-search] App root: {_root}")
-for dirpath, dirnames, filenames in os.walk(_root):
-    # Skip hidden dirs and __pycache__
-    dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
-    depth = dirpath.replace(_root, '').count(os.sep)
-    indent = '  ' * depth
-    print(f"{indent}{os.path.basename(dirpath)}/")
-    for f in filenames:
-        print(f"{indent}  {f}")
+_fn_root = os.path.dirname(os.path.abspath(__file__))
+for scan_dir in ["/var/task", "/var", os.path.dirname(_fn_root)]:
+        if os.path.isdir(scan_dir):
+            print(f"\n[fab-search] Scanning: {scan_dir}")
+            for dirpath, dirnames, filenames in os.walk(scan_dir):
+                dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
+                depth = dirpath.replace(scan_dir, '').count(os.sep)
+                indent = '  ' * depth
+                print(f"{indent}{os.path.basename(dirpath)}/")
+                for f in filenames:
+                    print(f"{indent}  {f}")
 
 
 @app.get("/")
@@ -49,18 +48,6 @@ def index():
         print(f"{indent}{os.path.basename(dirpath)}/")
         for f in filenames:
             print(f"{indent}  {f}")
-
-    # Also scan /var/task (Vercel serverless function root) and common parent dirs
-    for scan_dir in ["/var/task", "/var", os.path.dirname(_fn_root)]:
-        if os.path.isdir(scan_dir):
-            print(f"\n[fab-search] Scanning: {scan_dir}")
-            for dirpath, dirnames, filenames in os.walk(scan_dir):
-                dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
-                depth = dirpath.replace(scan_dir, '').count(os.sep)
-                indent = '  ' * depth
-                print(f"{indent}{os.path.basename(dirpath)}/")
-                for f in filenames:
-                    print(f"{indent}  {f}")
 
     return FileResponse(os.path.join("./public/", "index.html"))
 
