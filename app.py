@@ -22,20 +22,6 @@ def health():
     return {"status": "ok"}
 
 
-# Serve static frontend files
-#_public_dir = os.path.join(os.path.dirname(__file__), "public")
-_fn_root = os.path.dirname(os.path.abspath(__file__))
-for scan_dir in ["/var/task", "/var", os.path.dirname(_fn_root)]:
-        if os.path.isdir(scan_dir):
-            print(f"\n[fab-search] Scanning: {scan_dir}")
-            for dirpath, dirnames, filenames in os.walk(scan_dir):
-                dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
-                depth = dirpath.replace(scan_dir, '').count(os.sep)
-                indent = '  ' * depth
-                print(f"{indent}{os.path.basename(dirpath)}/")
-                for f in filenames:
-                    print(f"{indent}  {f}")
-
 
 @app.get("/")
 def index():
@@ -49,7 +35,7 @@ def index():
         for f in filenames:
             print(f"{indent}  {f}")
 
-    return FileResponse(os.path.join("/var/task/", "index.html"))
+    return {"message": "fab-search is running"}
 
 
 # app.mount("/", StaticFiles(directory=_public_dir), name="static")
