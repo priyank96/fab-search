@@ -22,8 +22,11 @@ def health():
     return {"status": "ok"}
 
 
-# Serve static frontend files
-_public_dir = os.path.join(os.path.dirname(__file__), "public")
+# Serve static frontend files — Vercel flattens into root, locally they're in public/
+_root = os.path.dirname(__file__)
+_public_dir = os.path.join(_root, "public")
+if not os.path.isdir(_public_dir):
+    _public_dir = _root
 
 
 @app.get("/")
