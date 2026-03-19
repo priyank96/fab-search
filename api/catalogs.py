@@ -20,7 +20,7 @@ async def list_catalogs():
     return {"catalogs": catalogs, "total": len(catalogs)}
 
 
-@router.delete("/api/catalogs/{catalog_name}")
+@router.delete("/api/catalogs/{catalog_name:path}")
 async def remove_catalog(catalog_name: str):
     """Remove a catalog from the Pinecone index."""
     store = PineconeStore()
