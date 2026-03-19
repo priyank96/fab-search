@@ -34,10 +34,22 @@ async def manage_catalog(body: CatalogAction):
 
     store = PineconeStore()
 
-    if not store.has_catalog(body.catalog_name):
-        raise HTTPException(status_code=404, detail=f"Catalog '{body.catalog_name}' not found")
+    has_vectors = store.has_catalog(body.catalog_name)
+    blob_urls = store.get_catalog_blob_urls(body.catalog_name) if has_vectors else []
 
-    blob_urls = store.get_catalog_blob_urls(body.catalog_name)
-    store.remove_catalog(body.catalog_name)
-    deleted = delete_catalog_blobs(blob_urls)
-    return {"message": f"Catalog '{body.catalog_name}' removed ({deleted} blobs deleted)", "catalog_name": body.catalog_name}
+    if not has_vectors and not blob_urls:
+        return {
+            "message": f"Catalog '{body.catalog_name}' already deleted",
+            "catalog_name": body.catalog_name,
+        }
+
+    deleted_blobs = 0
+    if blob_urls:
+        deleted_blobs = delete_catalog_blobs(blob_urls)
+    if has_vectors:
+        store.remove_catalog(body.catalog_name)
+
+    return {
+        "message": f"Catalog '{body.catalog_name}' removed ({deleted_blobs} blobs deleted)",
+        "catalog_name": body.catalog_name,
+    }

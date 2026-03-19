@@ -186,9 +186,9 @@ def cmd_add(args):
     # Remove old version if it exists
     if store.has_catalog(pdf_name):
         blob_urls = store.get_catalog_blob_urls(pdf_name)
+        deleted_blobs = delete_catalog_blobs(blob_urls)
         store.remove_catalog(pdf_name)
-        deleted = delete_catalog_blobs(blob_urls)
-        print(f"Removed previous version of '{pdf_name}' ({deleted} blobs deleted)")
+        print(f"Removed previous version of '{pdf_name}' ({deleted_blobs} blobs deleted)")
 
     os.makedirs(PAGES_DIR, exist_ok=True)
 
@@ -210,7 +210,10 @@ def cmd_remove(args):
     catalog_name = args.catalog_name
     store = PineconeStore()
 
-    if not store.has_catalog(catalog_name):
+    has_vectors = store.has_catalog(catalog_name)
+    blob_urls = store.get_catalog_blob_urls(catalog_name) if has_vectors else []
+
+    if not has_vectors:
         catalogs = store.list_catalogs()
         print(f"Catalog '{catalog_name}' not found in index.")
         if catalogs:
@@ -219,10 +222,9 @@ def cmd_remove(args):
                 print(f"  - {c['pdf_name']}")
         return
 
-    blob_urls = store.get_catalog_blob_urls(catalog_name)
+    deleted_blobs = delete_catalog_blobs(blob_urls)
     store.remove_catalog(catalog_name)
-    deleted = delete_catalog_blobs(blob_urls)
-    print(f"Removed '{catalog_name}' from index ({deleted} blobs deleted).")
+    print(f"Removed '{catalog_name}' from index ({deleted_blobs} blobs deleted).")
 
 
 def cmd_rebuild(_args):
@@ -238,9 +240,9 @@ def cmd_rebuild(_args):
     existing = store.list_catalogs()
     for cat in existing:
         blob_urls = store.get_catalog_blob_urls(cat["pdf_name"])
+        deleted_blobs = delete_catalog_blobs(blob_urls)
         store.remove_catalog(cat["pdf_name"])
-        deleted = delete_catalog_blobs(blob_urls)
-        print(f"Removed existing catalog: {cat['pdf_name']} ({deleted} blobs deleted)")
+        print(f"Removed existing catalog: {cat['pdf_name']} ({deleted_blobs} blobs deleted)")
 
     os.makedirs(PAGES_DIR, exist_ok=True)
 
