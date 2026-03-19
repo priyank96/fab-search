@@ -49,7 +49,7 @@ def index():
         for f in filenames:
             print(f"{indent}  {f}")
 
-    return FileResponse(os.path.join("./public/", "index.html"))
+    return FileResponse(os.path.join("/var/task/", "index.html"))
 
 
 # app.mount("/", StaticFiles(directory=_public_dir), name="static")
