@@ -25,27 +25,8 @@ def health():
 
 @app.get("/")
 def index():
-    _fn_root = os.path.dirname(os.path.abspath(__file__))
-    # Check common locations for static/public folders
-    candidates = [
-        os.path.join(_fn_root, "public"),
-        os.path.join(_fn_root, "static"),
-        "/var/task/public",
-        "/var/task/static",
-        "/var/task",
-        "public/",
-        "/public/",
-        "/var/task/index.html",
-        "index.html"
-    ]
-    found = {p: (os.path.isdir(p) if not p.endswith('.html') else os.path.isfile(p)) for p in candidates}
-    print(f"[fab-search] __file__: {os.path.abspath(__file__)}")
-    print(f"[fab-search] root: {_fn_root}")
-    for path, exists in found.items():
-        label = "EXISTS" if exists else "NOT FOUND"
-        print(f"[fab-search] {path}: {label}")
-
-    return {"message": "fab-search is running", "root": _fn_root, "paths": found}
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/index.html")
 
 
 # app.mount("/", StaticFiles(directory=_public_dir), name="static")
