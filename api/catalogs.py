@@ -7,6 +7,7 @@ fab-search — Catalog management API endpoints.
 from fastapi import APIRouter, HTTPException
 
 from src.pinecone_store import PineconeStore
+from src.blob_store import delete_catalog_blobs
 
 router = APIRouter()
 
@@ -27,5 +28,7 @@ async def remove_catalog(catalog_name: str):
     if not store.has_catalog(catalog_name):
         raise HTTPException(status_code=404, detail=f"Catalog '{catalog_name}' not found")
 
+    blob_urls = store.get_catalog_blob_urls(catalog_name)
     store.remove_catalog(catalog_name)
-    return {"message": f"Catalog '{catalog_name}' removed", "catalog_name": catalog_name}
+    deleted = delete_catalog_blobs(blob_urls)
+    return {"message": f"Catalog '{catalog_name}' removed ({deleted} blobs deleted)", "catalog_name": catalog_name}

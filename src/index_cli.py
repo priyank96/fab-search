@@ -34,7 +34,7 @@ from src.pdf_processor import render_pdf
 from src.segment import detect_regions
 from src.tiler import generate_filtered_tiles
 from src.pinecone_store import PineconeStore
-from src.blob_store import upload_page_image
+from src.blob_store import upload_page_image, delete_catalog_blobs
 
 
 def index_single_pdf(pdf_path: str, store: PineconeStore) -> tuple[int, int, int]:
@@ -185,8 +185,10 @@ def cmd_add(args):
 
     # Remove old version if it exists
     if store.has_catalog(pdf_name):
+        blob_urls = store.get_catalog_blob_urls(pdf_name)
         store.remove_catalog(pdf_name)
-        print(f"Removed previous version of '{pdf_name}'")
+        deleted = delete_catalog_blobs(blob_urls)
+        print(f"Removed previous version of '{pdf_name}' ({deleted} blobs deleted)")
 
     os.makedirs(PAGES_DIR, exist_ok=True)
 
@@ -217,8 +219,10 @@ def cmd_remove(args):
                 print(f"  - {c['pdf_name']}")
         return
 
+    blob_urls = store.get_catalog_blob_urls(catalog_name)
     store.remove_catalog(catalog_name)
-    print(f"Removed '{catalog_name}' from index.")
+    deleted = delete_catalog_blobs(blob_urls)
+    print(f"Removed '{catalog_name}' from index ({deleted} blobs deleted).")
 
 
 def cmd_rebuild(_args):
@@ -233,8 +237,10 @@ def cmd_rebuild(_args):
     # Remove all existing catalogs first
     existing = store.list_catalogs()
     for cat in existing:
+        blob_urls = store.get_catalog_blob_urls(cat["pdf_name"])
         store.remove_catalog(cat["pdf_name"])
-        print(f"Removed existing catalog: {cat['pdf_name']}")
+        deleted = delete_catalog_blobs(blob_urls)
+        print(f"Removed existing catalog: {cat['pdf_name']} ({deleted} blobs deleted)")
 
     os.makedirs(PAGES_DIR, exist_ok=True)
 

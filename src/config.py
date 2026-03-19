@@ -28,7 +28,7 @@ CLIP_PRETRAINED = "laion2b_s34b_b79k"
 EMBEDDING_DIM = 512  # ViT-B-32 output dimension
 
 # ── PDF rendering ─────────────────────────────────────────────
-DPI = 200
+DPI = 140
 
 # ── Tiling parameters ────────────────────────────────────────
 TILE_SIZE = 1280

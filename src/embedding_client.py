@@ -120,12 +120,19 @@ def encode_image(pil_image: Image.Image) -> np.ndarray:
         1-D float32 numpy array (512-dim for ViT-B-32).
     """
     img = pil_image.convert("RGB")
+
+    # Downscale to max 512px on longest side before uploading — CLIP (ViT-B-32)
+    # resizes to 224×224 internally, so larger images waste network bandwidth.
+    max_side = 512
+    if max(img.size) > max_side:
+        img.thumbnail((max_side, max_side), Image.LANCZOS)
+
     log.debug("Image to encode: size=%s", img.size)
 
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.save(buf, format="JPEG", quality=85)
     img_bytes = buf.getvalue()
-    log.debug("PNG size: %d bytes", len(img_bytes))
+    log.debug("JPEG size: %d bytes", len(img_bytes))
 
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):

@@ -43,9 +43,9 @@ def render_pdf(pdf_path: str, dpi: int, pages_dir: str) -> list[tuple[int, str, 
         # Convert pixmap to PIL Image
         img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
-        filename = f"{pdf_name}_page_{page_num:04d}.png"
+        filename = f"{pdf_name}_page_{page_num:04d}.jpg"
         filepath = os.path.join(pages_dir, filename)
-        img.save(filepath, "PNG")
+        img.save(filepath, "JPEG", quality=85)
 
         results.append((page_num, filepath, img))
 

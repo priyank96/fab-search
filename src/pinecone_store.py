@@ -212,6 +212,27 @@ class PineconeStore:
             for name, stats in sorted(catalog_stats.items())
         ]
 
+    def get_catalog_blob_urls(self, pdf_name: str) -> list[str]:
+        """
+        Get unique page_image blob URLs for a catalog.
+
+        Queries Pinecone for all vectors of the given catalog and
+        collects the distinct page_image URLs (one per page).
+        """
+        dummy_vec = [0.0] * EMBEDDING_DIM
+        results = self.index.query(
+            vector=dummy_vec,
+            top_k=10000,
+            include_metadata=True,
+            filter={"pdf_name": {"$eq": pdf_name}},
+        )
+        urls: set[str] = set()
+        for match in results.matches:
+            url = match.metadata.get("page_image")
+            if url:
+                urls.add(url)
+        return list(urls)
+
     def has_catalog(self, pdf_name: str) -> bool:
         """Check whether a catalog exists in the index."""
         dummy_vec = [0.0] * EMBEDDING_DIM
