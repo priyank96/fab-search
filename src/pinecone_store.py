@@ -18,10 +18,13 @@ Pinecone metadata fields per vector:
 """
 
 import uuid
+import logging
 import numpy as np
 from pinecone import Pinecone
 
 from src.config import PINECONE_API_KEY, PINECONE_INDEX_NAME, EMBEDDING_DIM
+
+log = logging.getLogger(__name__)
 
 
 def _get_pinecone_index():
@@ -164,6 +167,7 @@ class PineconeStore:
         Uses metadata filtering to find vectors, then deletes by ID.
         Returns the number of vectors removed.
         """
+        log.info("remove_catalog: deleting vectors with pdf_name=%r", pdf_name)
         total_removed = 0
 
         # Pinecone delete with metadata filter
@@ -203,6 +207,10 @@ class PineconeStore:
             catalog_stats[name]["pages"].add(meta["page_number"])
             catalog_stats[name]["vectors"] += 1
 
+        log.info("list_catalogs: found %d catalog(s): %s",
+                 len(catalog_stats),
+                 [name for name in sorted(catalog_stats.keys())])
+
         return [
             {
                 "pdf_name": name,
@@ -219,6 +227,7 @@ class PineconeStore:
         Queries Pinecone for all vectors of the given catalog and
         collects the distinct page_image URLs (one per page).
         """
+        log.info("get_catalog_blob_urls: querying with pdf_name=%r", pdf_name)
         dummy_vec = [0.0] * EMBEDDING_DIM
         results = self.index.query(
             vector=dummy_vec,
@@ -231,10 +240,12 @@ class PineconeStore:
             url = match.metadata.get("page_image")
             if url:
                 urls.add(url)
+        log.info("get_catalog_blob_urls: found %d unique blob URLs", len(urls))
         return list(urls)
 
     def has_catalog(self, pdf_name: str) -> bool:
         """Check whether a catalog exists in the index."""
+        log.info("has_catalog: checking pdf_name=%r", pdf_name)
         dummy_vec = [0.0] * EMBEDDING_DIM
         results = self.index.query(
             vector=dummy_vec,
@@ -242,4 +253,6 @@ class PineconeStore:
             include_metadata=True,
             filter={"pdf_name": {"$eq": pdf_name}},
         )
-        return len(results.matches) > 0
+        found = len(results.matches) > 0
+        log.info("has_catalog: pdf_name=%r -> %s", pdf_name, found)
+        return found

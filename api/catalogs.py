@@ -4,12 +4,14 @@ from __future__ import annotations
 fab-search — Catalog management API endpoints.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.pinecone_store import PineconeStore
 from src.blob_store import delete_catalog_blobs
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -33,6 +35,8 @@ async def manage_catalog(body: CatalogAction):
         raise HTTPException(status_code=400, detail=f"Unknown action: {body.action}")
 
     store = PineconeStore()
+
+    log.info("manage_catalog: action=%r, catalog_name=%r", body.action, body.catalog_name)
 
     has_vectors = store.has_catalog(body.catalog_name)
     blob_urls = store.get_catalog_blob_urls(body.catalog_name) if has_vectors else []
