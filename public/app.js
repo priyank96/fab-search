@@ -227,8 +227,10 @@
         if (!confirm("Remove catalog \"" + name + "\"? This cannot be undone.")) return;
 
         try {
-            const res = await fetch("/api/catalogs/" + encodeURIComponent(name), {
-                method: "DELETE",
+            const res = await fetch("/api/catalogs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "delete", catalog_name: name }),
             });
             if (!res.ok) throw new Error("Delete failed");
             loadCatalogs();
