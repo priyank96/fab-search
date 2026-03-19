@@ -37,7 +37,7 @@ BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
 ### 3. Run locally
 
 ```bash
-uvicorn main:app --reload --port 5001
+uvicorn app:app --reload --port 5001
 ```
 
 Open http://localhost:5001 in your browser.
@@ -83,7 +83,7 @@ curl -X POST http://localhost:5001/api/search \
 
 ```
 fab-search/
-├── main.py              # FastAPI entry point
+├── app.py               # FastAPI entry point
 ├── vercel.json          # Vercel deployment config
 ├── api/
 │   ├── search.py        # POST /api/search
