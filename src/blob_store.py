@@ -11,6 +11,7 @@ Uses the Vercel Blob REST API with a read-write token.
 
 import io
 import logging
+import time
 import httpx
 from PIL import Image
 
@@ -39,18 +40,30 @@ def upload_page_image(
     pil_image.convert("RGB").save(buf, format="JPEG", quality=85)
     blob_bytes = buf.getvalue()
 
-    response = httpx.put(
-        f"{_BLOB_API_URL}/{filename}",
-        content=blob_bytes,
-        headers={
-            "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
-            "x-content-type": "image/jpeg",
-            "x-cache-control-max-age": "31536000",
-        },
-        timeout=60.0,
-    )
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        response = httpx.put(
+            f"{_BLOB_API_URL}/{filename}",
+            content=blob_bytes,
+            headers={
+                "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
+                "x-content-type": "image/jpeg",
+                "x-cache-control-max-age": "31536000",
+            },
+            timeout=60.0,
+        )
 
-    if response.status_code != 200:
+        if response.status_code == 200:
+            break
+
+        if response.status_code == 503 and attempt < max_retries:
+            log.warning(
+                "Blob upload got 503 (attempt %d/%d), retrying in 30s...",
+                attempt, max_retries,
+            )
+            time.sleep(30)
+            continue
+
         raise RuntimeError(
             f"Blob upload failed ({response.status_code}): {response.text}"
         )
