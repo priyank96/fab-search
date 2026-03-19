@@ -246,7 +246,9 @@ class PineconeStore:
     def has_catalog(self, pdf_name: str) -> bool:
         """Check whether a catalog exists in the index."""
         log.info("has_catalog: checking pdf_name=%r", pdf_name)
+        dummy_vec = [1.0] * EMBEDDING_DIM
         results = self.index.query(
+            vector=dummy_vec,
             top_k=1,
             include_metadata=True,
             filter={"pdf_name": {"$eq": pdf_name}},
