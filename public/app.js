@@ -15,11 +15,19 @@
     const loading = document.getElementById("loading");
     const resultsContainer = document.getElementById("results");
 
+    const cropModal = document.getElementById("crop-modal");
+    const cropImage = document.getElementById("crop-image");
+    const cropConfirmBtn = document.getElementById("crop-confirm-btn");
+    const cropCancelBtn = document.getElementById("crop-cancel-btn");
+    const recropBtn = document.getElementById("recrop-btn");
+
     const catalogsLoading = document.getElementById("catalogs-loading");
     const catalogsList = document.getElementById("catalogs-list");
     const catalogsEmpty = document.getElementById("catalogs-empty");
 
     let selectedFile = null;
+    let originalDataUrl = null;
+    let cropper = null;
 
     // ── Navigation ────────────────────────────────────────────
     document.querySelectorAll(".nav-links a").forEach((link) => {
@@ -59,22 +67,69 @@
 
     function handleFile(file) {
         if (!file.type.startsWith("image/")) return;
-        selectedFile = file;
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            previewImage.src = e.target.result;
-            previewContainer.classList.remove("hidden");
-            uploadArea.classList.add("hidden");
-            searchBtn.disabled = false;
+            originalDataUrl = e.target.result;
+            openCropModal(originalDataUrl);
         };
         reader.readAsDataURL(file);
     }
 
-    clearBtn.addEventListener("click", () => {
+    function openCropModal(dataUrl) {
+        cropImage.src = dataUrl;
+        cropModal.classList.remove("hidden");
+        uploadArea.classList.add("hidden");
+        previewContainer.classList.add("hidden");
+
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(cropImage, {
+            viewMode: 1,
+            autoCropArea: 0.8,
+            movable: true,
+            zoomable: true,
+            rotatable: false,
+            scalable: false,
+            responsive: true,
+            background: false,
+            checkCrossOrigin: false,
+        });
+    }
+
+    cropConfirmBtn.addEventListener("click", () => {
+        if (!cropper) return;
+        const canvas = cropper.getCroppedCanvas();
+        canvas.toBlob((blob) => {
+            selectedFile = new File([blob], "crop.jpg", { type: "image/jpeg" });
+            previewImage.src = URL.createObjectURL(blob);
+            previewContainer.classList.remove("hidden");
+            cropModal.classList.add("hidden");
+            cropper.destroy();
+            cropper = null;
+            searchBtn.disabled = false;
+        }, "image/jpeg", 0.9);
+    });
+
+    cropCancelBtn.addEventListener("click", () => {
+        if (cropper) { cropper.destroy(); cropper = null; }
+        cropModal.classList.add("hidden");
+        originalDataUrl = null;
         selectedFile = null;
         fileInput.value = "";
+        uploadArea.classList.remove("hidden");
+    });
+
+    recropBtn.addEventListener("click", () => {
+        if (originalDataUrl) openCropModal(originalDataUrl);
+    });
+
+    clearBtn.addEventListener("click", () => {
+        if (cropper) { cropper.destroy(); cropper = null; }
+        selectedFile = null;
+        originalDataUrl = null;
+        fileInput.value = "";
         previewContainer.classList.add("hidden");
+        cropModal.classList.add("hidden");
         uploadArea.classList.remove("hidden");
         searchBtn.disabled = true;
         resultsContainer.innerHTML = "";

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>fab-search</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -32,8 +33,25 @@
                 <p class="upload-hint">JPG, PNG, or WebP</p>
             </div>
 
+            <!-- Crop modal -->
+            <div id="crop-modal" class="crop-modal hidden">
+                <div class="crop-container">
+                    <img id="crop-image" alt="Crop preview">
+                </div>
+                <div class="crop-toolbar">
+                    <button id="crop-cancel-btn" class="btn-secondary">Cancel</button>
+                    <button id="crop-confirm-btn" class="btn-primary">Confirm Crop</button>
+                </div>
+            </div>
+
             <div id="preview-container" class="preview-container hidden">
                 <img id="preview-image" alt="Query preview">
+                <button id="recrop-btn" class="btn-icon" title="Re-crop" style="right:2.75rem">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2v6h6M18 22v-6h-6"/>
+                        <path d="M21 12A9 9 0 0 0 6.636 5.636L2 8m20 8l-4.636 2.364A9 9 0 0 1 3 12"/>
+                    </svg>
+                </button>
                 <button id="clear-btn" class="btn-icon" title="Clear">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -67,6 +85,7 @@
         </section>
     </main>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <script src="/app.js"></script>
 </body>
 </html>
