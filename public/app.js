@@ -204,6 +204,193 @@
             .join("");
     }
 
+    // ── Image viewer modal ────────────────────────────────────
+    const viewerModal = document.getElementById("viewer-modal");
+    const viewerImage = document.getElementById("viewer-image");
+    const viewerCanvas = document.getElementById("viewer-canvas");
+    const viewerBody = document.getElementById("viewer-body");
+    const viewerCloseBtn = document.getElementById("viewer-close-btn");
+    const viewerMeta = document.getElementById("viewer-meta");
+
+    resultsContainer.addEventListener("click", (e) => {
+        const wrap = e.target.closest(".result-image-wrap");
+        if (!wrap) return;
+        const img = wrap.querySelector("img");
+        if (!img) return;
+
+        viewerImage.src = img.src;
+        viewerImage.onload = () => {
+            viewerCanvas.width = viewerImage.naturalWidth;
+            viewerCanvas.height = viewerImage.naturalHeight;
+            const tileX = +img.dataset.tileX;
+            const tileY = +img.dataset.tileY;
+            const tileW = +img.dataset.tileW;
+            const tileH = +img.dataset.tileH;
+            const natW = viewerImage.naturalWidth;
+            const natH = viewerImage.naturalHeight;
+            if (!(tileX === 0 && tileY === 0 && tileW === natW && tileH === natH)) {
+                const ctx = viewerCanvas.getContext("2d");
+                ctx.clearRect(0, 0, viewerCanvas.width, viewerCanvas.height);
+                ctx.strokeStyle = "#ef4444";
+                ctx.lineWidth = 4;
+                ctx.strokeRect(tileX, tileY, tileW, tileH);
+            }
+        };
+
+        const card = wrap.closest(".result-card");
+        const meta = card ? card.querySelector(".result-meta") : null;
+        viewerMeta.textContent = meta ? meta.textContent.replace(/\s+/g, " ").trim() : "";
+
+        viewerState.scale = 1;
+        viewerState.x = 0;
+        viewerState.y = 0;
+        applyViewerTransform();
+        viewerModal.classList.remove("hidden");
+    });
+
+    viewerCloseBtn.addEventListener("click", () => {
+        viewerModal.classList.add("hidden");
+    });
+
+    // Close on backdrop click (not on the image itself)
+    viewerModal.addEventListener("click", (e) => {
+        if (e.target === viewerModal || e.target.classList.contains("viewer-content")) {
+            viewerModal.classList.add("hidden");
+        }
+    });
+
+    // ── Viewer pan & zoom ─────────────────────────────────────
+    const viewerState = { scale: 1, x: 0, y: 0 };
+    const pointers = new Map();
+    let lastPinchDist = 0;
+    let lastPinchCenter = null;
+    let lastTapTime = 0;
+
+    function applyViewerTransform() {
+        viewerBody.style.transform =
+            "translate(" + viewerState.x + "px," + viewerState.y + "px) scale(" + viewerState.scale + ")";
+    }
+
+    function getDistance(p1, p2) {
+        const dx = p1.clientX - p2.clientX;
+        const dy = p1.clientY - p2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function getCenter(p1, p2) {
+        return { x: (p1.clientX + p2.clientX) / 2, y: (p1.clientY + p2.clientY) / 2 };
+    }
+
+    const viewerContent = document.querySelector(".viewer-content");
+
+    viewerContent.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".viewer-close") || e.target.closest(".viewer-meta")) return;
+        pointers.set(e.pointerId, e);
+        viewerContent.setPointerCapture(e.pointerId);
+
+        if (pointers.size === 2) {
+            const pts = Array.from(pointers.values());
+            lastPinchDist = getDistance(pts[0], pts[1]);
+            lastPinchCenter = getCenter(pts[0], pts[1]);
+        }
+
+        // Double-tap detection
+        if (pointers.size === 1) {
+            const now = Date.now();
+            if (now - lastTapTime < 300) {
+                // Toggle 1x ↔ 2x
+                if (viewerState.scale > 1.1) {
+                    viewerState.scale = 1;
+                    viewerState.x = 0;
+                    viewerState.y = 0;
+                } else {
+                    const rect = viewerContent.getBoundingClientRect();
+                    const cx = e.clientX - rect.left - rect.width / 2;
+                    const cy = e.clientY - rect.top - rect.height / 2;
+                    viewerState.scale = 2;
+                    viewerState.x = -cx;
+                    viewerState.y = -cy;
+                }
+                applyViewerTransform();
+                lastTapTime = 0;
+            } else {
+                lastTapTime = now;
+            }
+        }
+    });
+
+    viewerContent.addEventListener("pointermove", (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        const prev = pointers.get(e.pointerId);
+        pointers.set(e.pointerId, e);
+
+        if (pointers.size === 1 && viewerState.scale > 1) {
+            // Pan
+            viewerState.x += e.clientX - prev.clientX;
+            viewerState.y += e.clientY - prev.clientY;
+            applyViewerTransform();
+        } else if (pointers.size === 2) {
+            // Pinch zoom
+            const pts = Array.from(pointers.values());
+            const dist = getDistance(pts[0], pts[1]);
+            const center = getCenter(pts[0], pts[1]);
+
+            if (lastPinchDist > 0) {
+                const ratio = dist / lastPinchDist;
+                const newScale = Math.min(5, Math.max(1, viewerState.scale * ratio));
+
+                if (lastPinchCenter) {
+                    const rect = viewerContent.getBoundingClientRect();
+                    const cx = center.x - rect.left;
+                    const cy = center.y - rect.top;
+                    const ds = newScale / viewerState.scale;
+                    viewerState.x = cx - ds * (cx - viewerState.x);
+                    viewerState.y = cy - ds * (cy - viewerState.y);
+                }
+
+                viewerState.scale = newScale;
+                applyViewerTransform();
+            }
+
+            lastPinchDist = dist;
+            lastPinchCenter = center;
+        }
+    });
+
+    viewerContent.addEventListener("pointerup", (e) => {
+        pointers.delete(e.pointerId);
+        if (pointers.size < 2) {
+            lastPinchDist = 0;
+            lastPinchCenter = null;
+        }
+    });
+
+    viewerContent.addEventListener("pointercancel", (e) => {
+        pointers.delete(e.pointerId);
+        if (pointers.size < 2) {
+            lastPinchDist = 0;
+            lastPinchCenter = null;
+        }
+    });
+
+    // Mouse wheel zoom (desktop)
+    viewerContent.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newScale = Math.min(5, Math.max(1, viewerState.scale * delta));
+
+        const rect = viewerContent.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const ds = newScale / viewerState.scale;
+        viewerState.x = cx - ds * (cx - viewerState.x);
+        viewerState.y = cy - ds * (cy - viewerState.y);
+
+        viewerState.scale = newScale;
+        if (viewerState.scale <= 1) { viewerState.x = 0; viewerState.y = 0; }
+        applyViewerTransform();
+    }, { passive: false });
+
     // ── Highlight overlay ─────────────────────────────────────
     window.drawHighlight = function (img) {
         const canvas = img.parentElement.querySelector("canvas");
