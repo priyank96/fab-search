@@ -43,7 +43,7 @@
     // Catalog filter state
     let allCatalogNames = [];
     let selectedCatalogs = new Set();
-    const TEMPLATE_KEY = "fab-search-templates";
+    const TEMPLATE_KEY = "fab-search-collections";
 
     // ── Navigation ────────────────────────────────────────────
     document.querySelectorAll(".nav-links a").forEach((link) => {
@@ -122,7 +122,7 @@
         }
     }
 
-    // ── Templates ─────────────────────────────────────────────
+    // ── Collections ───────────────────────────────────────────
     function getTemplates() {
         try {
             return JSON.parse(localStorage.getItem(TEMPLATE_KEY)) || [];
@@ -137,7 +137,7 @@
 
     function renderTemplateDropdown() {
         var templates = getTemplates();
-        templateSelect.innerHTML = '<option value="">Load template...</option>';
+        templateSelect.innerHTML = '<option value="">Load collection...</option>';
         templates.forEach(function (t, i) {
             var opt = document.createElement("option");
             opt.value = i;
@@ -158,7 +158,7 @@
 
     templateSaveBtn.addEventListener("click", () => {
         if (selectedCatalogs.size === 0) return;
-        var name = prompt("Template name:");
+        var name = prompt("Collection name:");
         if (!name || !name.trim()) return;
         var templates = getTemplates();
         templates.push({ name: name.trim(), catalogs: Array.from(selectedCatalogs) });
@@ -172,7 +172,7 @@
         var templates = getTemplates();
         var t = templates[+idx];
         if (!t) return;
-        if (!confirm('Delete template "' + t.name + '"?')) return;
+        if (!confirm('Delete collection "' + t.name + '"?')) return;
         templates.splice(+idx, 1);
         saveTemplates(templates);
         renderTemplateDropdown();
