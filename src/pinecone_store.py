@@ -114,9 +114,15 @@ class PineconeStore:
         self,
         query_embedding: np.ndarray,
         top_k: int = 5,
+        catalog_filter: list[str] | None = None,
     ) -> list[dict]:
         """
         Search for similar vectors, deduplicating by page.
+
+        Args:
+            query_embedding: 512-dim CLIP embedding.
+            top_k: Number of unique pages to return.
+            catalog_filter: If provided, restrict results to these pdf_names.
 
         Returns a list of result dicts with keys:
             rank, score, pdf_name, page_number,
@@ -125,11 +131,15 @@ class PineconeStore:
         # Over-fetch to allow page deduplication
         fetch_k = min(top_k * 20, 1000)
 
-        response = self.index.query(
+        query_kwargs = dict(
             vector=query_embedding.tolist(),
             top_k=fetch_k,
             include_metadata=True,
         )
+        if catalog_filter:
+            query_kwargs["filter"] = {"pdf_name": {"$in": catalog_filter}}
+
+        response = self.index.query(**query_kwargs)
 
         seen_pages: set[tuple[str, int]] = set()
         results: list[dict] = []

@@ -38,7 +38,7 @@ from src.pinecone_store import PineconeStore
 from src.blob_store import upload_page_image, delete_catalog_blobs
 
 
-def index_single_pdf(pdf_path: str, store: PineconeStore) -> tuple[int, int, int]:
+def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) -> tuple[int, int, int]:
     """
     Run the indexing pipeline for a single PDF.
 
@@ -169,6 +169,9 @@ def index_single_pdf(pdf_path: str, store: PineconeStore) -> tuple[int, int, int
         # Flush after each page so progress is saved incrementally
         store.flush()
 
+        if slow and page_num < len(pages):
+            time.sleep(2)
+
     # Flush remaining vectors to Pinecone
     store.flush()
     return pdf_pages, pdf_regions, pdf_vectors
@@ -219,7 +222,7 @@ def cmd_add(args):
 
     print(f"\nIndexing: {pdf_name}")
     t0 = time.time()
-    pages, regions, vectors = index_single_pdf(pdf_path, store)
+    pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
     elapsed = time.time() - t0
 
     store.close()
@@ -281,7 +284,7 @@ def cmd_rebuild(_args):
         pdf_name = os.path.basename(pdf_path)
         print(f"\n  [{pdf_idx + 1}/{len(pdf_files)}] {pdf_name}")
 
-        pages, regions, vectors = index_single_pdf(pdf_path, store)
+        pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
         total_pages += pages
         total_regions += regions
         total_vectors += vectors
@@ -309,6 +312,7 @@ def main():
 
     p_add = sub.add_parser("add", help="Add or re-index a single catalog PDF")
     p_add.add_argument("pdf", help="Path to the PDF file to index")
+    p_add.add_argument("--slow", action="store_true", help="Add a 2s pause between pages")
 
     p_rm = sub.add_parser("remove", help="Remove a catalog from the index")
     p_rm.add_argument(
@@ -316,7 +320,8 @@ def main():
         help='PDF filename to remove (e.g. "catalog.pdf")',
     )
 
-    sub.add_parser("rebuild", help="Full rebuild from all catalogs/ PDFs")
+    p_rebuild = sub.add_parser("rebuild", help="Full rebuild from all catalogs/ PDFs")
+    p_rebuild.add_argument("--slow", action="store_true", help="Add a 2s pause between pages")
 
     args = parser.parse_args()
 
@@ -339,6 +344,6 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s",
         datefmt="%H:%M:%S",
     )
-    # Only show debug logs from the embedding client
-    logging.getLogger("src.embedding_client").setLevel(logging.DEBUG)
+    # Only show error logs from the embedding client
+    logging.getLogger("src.embedding_client").setLevel(logging.ERROR)
     main()

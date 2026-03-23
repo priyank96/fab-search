@@ -25,9 +25,25 @@
     const catalogsList = document.getElementById("catalogs-list");
     const catalogsEmpty = document.getElementById("catalogs-empty");
 
+    // Catalog filter DOM refs
+    const catalogFilterSummary = document.getElementById("catalog-filter-summary");
+    const catalogFilterToggle = document.getElementById("catalog-filter-toggle");
+    const catalogFilterBody = document.getElementById("catalog-filter-body");
+    const catalogPillsContainer = document.getElementById("catalog-pills");
+    const catalogSelectAll = document.getElementById("catalog-select-all");
+    const catalogSelectNone = document.getElementById("catalog-select-none");
+    const templateSelect = document.getElementById("template-select");
+    const templateSaveBtn = document.getElementById("template-save-btn");
+    const templateDeleteBtn = document.getElementById("template-delete-btn");
+
     let selectedFile = null;
     let originalDataUrl = null;
     let cropper = null;
+
+    // Catalog filter state
+    let allCatalogNames = [];
+    let selectedCatalogs = new Set();
+    const TEMPLATE_KEY = "fab-search-templates";
 
     // ── Navigation ────────────────────────────────────────────
     document.querySelectorAll(".nav-links a").forEach((link) => {
@@ -42,6 +58,128 @@
             if (page === "catalogs") loadCatalogs();
         });
     });
+
+    // ── Catalog filter ────────────────────────────────────────
+    catalogFilterToggle.addEventListener("click", () => {
+        catalogFilterBody.classList.toggle("hidden");
+        catalogFilterToggle.textContent = catalogFilterBody.classList.contains("hidden") ? "Change" : "Hide";
+    });
+
+    catalogSelectAll.addEventListener("click", () => {
+        selectedCatalogs = new Set(allCatalogNames);
+        renderCatalogPills();
+    });
+
+    catalogSelectNone.addEventListener("click", () => {
+        selectedCatalogs.clear();
+        renderCatalogPills();
+    });
+
+    function loadCatalogFilter() {
+        fetch("/api/catalogs")
+            .then((r) => r.json())
+            .then((data) => {
+                allCatalogNames = data.catalogs.map((c) => c.pdf_name);
+                selectedCatalogs = new Set(allCatalogNames);
+                renderCatalogPills();
+                renderTemplateDropdown();
+            })
+            .catch(() => {});
+    }
+
+    function renderCatalogPills() {
+        catalogPillsContainer.innerHTML = allCatalogNames
+            .map((name) => {
+                var cls = selectedCatalogs.has(name) ? "catalog-pill selected" : "catalog-pill";
+                return '<span class="' + cls + '" data-catalog="' + escapeHtml(name) + '">' +
+                    escapeHtml(name.replace(/\.pdf$/i, "")) + "</span>";
+            })
+            .join("");
+
+        catalogPillsContainer.querySelectorAll(".catalog-pill").forEach((pill) => {
+            pill.addEventListener("click", () => {
+                var name = pill.dataset.catalog;
+                if (selectedCatalogs.has(name)) {
+                    selectedCatalogs.delete(name);
+                } else {
+                    selectedCatalogs.add(name);
+                }
+                pill.classList.toggle("selected");
+                updateFilterSummary();
+            });
+        });
+
+        updateFilterSummary();
+    }
+
+    function updateFilterSummary() {
+        if (selectedCatalogs.size === 0) {
+            catalogFilterSummary.textContent = "None selected";
+        } else if (selectedCatalogs.size === allCatalogNames.length) {
+            catalogFilterSummary.textContent = "All catalogs";
+        } else {
+            catalogFilterSummary.textContent = selectedCatalogs.size + " of " + allCatalogNames.length + " catalogs";
+        }
+    }
+
+    // ── Templates ─────────────────────────────────────────────
+    function getTemplates() {
+        try {
+            return JSON.parse(localStorage.getItem(TEMPLATE_KEY)) || [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function saveTemplates(templates) {
+        localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+    }
+
+    function renderTemplateDropdown() {
+        var templates = getTemplates();
+        templateSelect.innerHTML = '<option value="">Load template...</option>';
+        templates.forEach(function (t, i) {
+            var opt = document.createElement("option");
+            opt.value = i;
+            opt.textContent = t.name;
+            templateSelect.appendChild(opt);
+        });
+    }
+
+    templateSelect.addEventListener("change", () => {
+        var idx = templateSelect.value;
+        if (idx === "") return;
+        var templates = getTemplates();
+        var t = templates[+idx];
+        if (!t) return;
+        selectedCatalogs = new Set(t.catalogs.filter((c) => allCatalogNames.includes(c)));
+        renderCatalogPills();
+    });
+
+    templateSaveBtn.addEventListener("click", () => {
+        if (selectedCatalogs.size === 0) return;
+        var name = prompt("Template name:");
+        if (!name || !name.trim()) return;
+        var templates = getTemplates();
+        templates.push({ name: name.trim(), catalogs: Array.from(selectedCatalogs) });
+        saveTemplates(templates);
+        renderTemplateDropdown();
+    });
+
+    templateDeleteBtn.addEventListener("click", () => {
+        var idx = templateSelect.value;
+        if (idx === "") return;
+        var templates = getTemplates();
+        var t = templates[+idx];
+        if (!t) return;
+        if (!confirm('Delete template "' + t.name + '"?')) return;
+        templates.splice(+idx, 1);
+        saveTemplates(templates);
+        renderTemplateDropdown();
+    });
+
+    // Load catalog filter on page init
+    loadCatalogFilter();
 
     // ── File upload ───────────────────────────────────────────
     uploadArea.addEventListener("click", () => fileInput.click());
@@ -153,7 +291,11 @@
 
         try {
             const topK = topKSlider.value;
-            const res = await fetch("/api/search?top_k=" + encodeURIComponent(topK), {
+            var url = "/api/search?top_k=" + encodeURIComponent(topK);
+            if (selectedCatalogs.size > 0 && selectedCatalogs.size < allCatalogNames.length) {
+                url += "&catalogs=" + encodeURIComponent(Array.from(selectedCatalogs).join(","));
+            }
+            const res = await fetch(url, {
                 method: "POST",
                 body: formData,
             });

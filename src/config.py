@@ -31,8 +31,8 @@ EMBEDDING_DIM = 512  # ViT-B-32 output dimension
 DPI = 200
 
 # ── Tiling parameters ────────────────────────────────────────
-TILE_SIZE = 512
-STRIDE = 256
+TILE_SIZE = 1280
+STRIDE = 640
 BLANK_THRESHOLD = 0.90
 WHITE_VALUE = 240
 

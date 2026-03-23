@@ -65,6 +65,29 @@
                 <button id="search-btn" class="btn-primary" disabled>Search</button>
             </div>
 
+            <!-- Catalog filter -->
+            <div class="catalog-filter" id="catalog-filter">
+                <div class="catalog-filter-header">
+                    <span class="catalog-filter-label">Search in:</span>
+                    <span class="catalog-filter-summary" id="catalog-filter-summary">All catalogs</span>
+                    <button class="btn-text" id="catalog-filter-toggle">Change</button>
+                </div>
+                <div class="catalog-filter-body hidden" id="catalog-filter-body">
+                    <div class="catalog-filter-actions">
+                        <button class="btn-text" id="catalog-select-all">All</button>
+                        <button class="btn-text" id="catalog-select-none">None</button>
+                    </div>
+                    <div class="catalog-pills" id="catalog-pills"></div>
+                    <div class="template-controls">
+                        <select id="template-select">
+                            <option value="">Load template...</option>
+                        </select>
+                        <button class="btn-text" id="template-save-btn" title="Save current selection as template">Save</button>
+                        <button class="btn-text btn-danger-text" id="template-delete-btn" title="Delete selected template">Delete</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="loading" class="loading hidden">
                 <div class="spinner"></div>
                 <p>Searching catalogs...</p>

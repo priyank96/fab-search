@@ -19,6 +19,7 @@ router = APIRouter()
 async def search(
     file: UploadFile = File(..., description="Query image (jpg/png/webp)"),
     top_k: int = Query(default=TOP_K, ge=1, le=20, description="Number of results"),
+    catalogs: str = Query(default="", description="Comma-separated catalog names to search"),
 ):
     """
     Search the catalog index with an uploaded image.
@@ -31,8 +32,11 @@ async def search(
     # Get embedding from HF Space
     query_embedding = encode_image(query_image)
 
+    # Parse optional catalog filter
+    catalog_filter = [c.strip() for c in catalogs.split(",") if c.strip()] or None
+
     # Query Pinecone
     store = PineconeStore()
-    results = store.query(query_embedding, top_k=top_k)
+    results = store.query(query_embedding, top_k=top_k, catalog_filter=catalog_filter)
 
     return {"results": results, "total": len(results)}
