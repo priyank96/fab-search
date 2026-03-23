@@ -28,11 +28,12 @@ from src.config import (
     MORPH_KERNEL_SIZE, MERGE_IOU_THRESHOLD, REGION_PADDING,
     TILE_FALLBACK_MIN_REGIONS,
     TILE_SIZE, STRIDE, BLANK_THRESHOLD, WHITE_VALUE,
+    SIMILARITY_THRESHOLD,
 )
 from src.embedding_client import encode_image
 from src.pdf_processor import render_pdf
 from src.segment import detect_regions
-from src.tiler import generate_filtered_tiles
+from src.tiler import generate_filtered_tiles, split_into_quadrants, has_multiple_patterns
 from src.pinecone_store import PineconeStore
 from src.blob_store import upload_page_image, delete_catalog_blobs
 
@@ -92,26 +93,50 @@ def index_single_pdf(pdf_path: str, store: PineconeStore) -> tuple[int, int, int
                 page_img, TILE_SIZE, STRIDE, BLANK_THRESHOLD, WHITE_VALUE,
             )
             pdf_regions += len(tiles)
+            multi_split_count = 0
 
             for tx, ty, tile_img in tiles:
                 tw, th = tile_img.size
-                tile_embedding = encode_image(tile_img)
-                store.add(
-                    embedding=tile_embedding,
-                    pdf_name=pdf_name,
-                    page_number=page_num,
-                    tile_x=tx,
-                    tile_y=ty,
-                    tile_w=tw,
-                    tile_h=th,
-                    page_image=page_image_url,
-                )
-                page_vectors += 1
+
+                # Multi-pattern detection: split into quadrants and check diversity
+                quadrants = split_into_quadrants(tile_img)
+                quad_embeddings = [encode_image(q_img) for _, _, _, _, q_img in quadrants]
+
+                if has_multiple_patterns(quad_embeddings, SIMILARITY_THRESHOLD):
+                    # Tile has multiple patterns → index each quadrant separately
+                    multi_split_count += 1
+                    for (dx, dy, dw, dh, _), q_emb in zip(quadrants, quad_embeddings):
+                        store.add(
+                            embedding=q_emb,
+                            pdf_name=pdf_name,
+                            page_number=page_num,
+                            tile_x=tx + dx,
+                            tile_y=ty + dy,
+                            tile_w=dw,
+                            tile_h=dh,
+                            page_image=page_image_url,
+                        )
+                        page_vectors += 1
+                else:
+                    # Single pattern → encode full tile
+                    tile_embedding = encode_image(tile_img)
+                    store.add(
+                        embedding=tile_embedding,
+                        pdf_name=pdf_name,
+                        page_number=page_num,
+                        tile_x=tx,
+                        tile_y=ty,
+                        tile_w=tw,
+                        tile_h=th,
+                        page_image=page_image_url,
+                    )
+                    page_vectors += 1
 
             print(
                 f"    Page {page_num:>3d}: "
                 f"0 regions -> TILE FALLBACK "
-                f"({len(tiles)} tiles, {blank_count} blank skipped) + 1 page -> "
+                f"({len(tiles)} tiles, {blank_count} blank skipped, "
+                f"{multi_split_count} multi-pattern splits) + 1 page -> "
                 f"{page_vectors:>3d} vectors"
             )
         else:

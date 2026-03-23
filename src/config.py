@@ -28,11 +28,11 @@ CLIP_PRETRAINED = "laion2b_s34b_b79k"
 EMBEDDING_DIM = 512  # ViT-B-32 output dimension
 
 # ── PDF rendering ─────────────────────────────────────────────
-DPI = 140
+DPI = 200
 
 # ── Tiling parameters ────────────────────────────────────────
-TILE_SIZE = 1280
-STRIDE = 640
+TILE_SIZE = 512
+STRIDE = 256
 BLANK_THRESHOLD = 0.90
 WHITE_VALUE = 240
 
@@ -43,6 +43,11 @@ MORPH_KERNEL_SIZE = 15
 MERGE_IOU_THRESHOLD = 0.30
 REGION_PADDING = 10
 TILE_FALLBACK_MIN_REGIONS = 1
+
+# ── Multi-pattern detection ───────────────────────────────────
+# When a tile's 4 quadrants have pairwise cosine similarity below
+# this threshold, the tile is split into 4 separate vectors.
+SIMILARITY_THRESHOLD = 0.75
 
 # ── Search ────────────────────────────────────────────────────
 TOP_K = 5

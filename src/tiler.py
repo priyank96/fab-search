@@ -69,3 +69,43 @@ def generate_filtered_tiles(
     ]
     blank_count = raw_count - len(filtered)
     return filtered, raw_count, blank_count
+
+
+def split_into_quadrants(
+    tile_image: Image.Image,
+) -> list[tuple[int, int, int, int, Image.Image]]:
+    """
+    Split a tile into 4 equal quadrants.
+
+    Returns:
+        List of (dx, dy, dw, dh, quadrant_image) for each quadrant,
+        where dx, dy are pixel offsets within the tile.
+    """
+    w, h = tile_image.size
+    half_w, half_h = w // 2, h // 2
+
+    return [
+        (0, 0, half_w, half_h, tile_image.crop((0, 0, half_w, half_h))),
+        (half_w, 0, half_w, half_h, tile_image.crop((half_w, 0, w, half_h))),
+        (0, half_h, half_w, half_h, tile_image.crop((0, half_h, half_w, h))),
+        (half_w, half_h, half_w, half_h, tile_image.crop((half_w, half_h, w, h))),
+    ]
+
+
+def has_multiple_patterns(
+    embeddings: list[np.ndarray],
+    threshold: float,
+) -> bool:
+    """
+    Check if quadrant embeddings suggest multiple distinct patterns.
+
+    Computes all pairwise cosine similarities (embeddings must be
+    L2-normalized) and returns True if the minimum falls below threshold.
+    """
+    min_sim = 1.0
+    for i in range(len(embeddings)):
+        for j in range(i + 1, len(embeddings)):
+            sim = float(np.dot(embeddings[i], embeddings[j]))
+            if sim < min_sim:
+                min_sim = sim
+    return min_sim < threshold
