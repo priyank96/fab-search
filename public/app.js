@@ -6,6 +6,9 @@
     // ── DOM refs ──────────────────────────────────────────────
     const uploadArea = document.getElementById("upload-area");
     const fileInput = document.getElementById("file-input");
+    const cameraInput = document.getElementById("camera-input");
+    const cameraBtn = document.getElementById("camera-btn");
+    const galleryBtn = document.getElementById("gallery-btn");
     const previewContainer = document.getElementById("preview-container");
     const previewImage = document.getElementById("preview-image");
     const clearBtn = document.getElementById("clear-btn");
@@ -182,7 +185,8 @@
     loadCatalogFilter();
 
     // ── File upload ───────────────────────────────────────────
-    uploadArea.addEventListener("click", () => fileInput.click());
+    cameraBtn.addEventListener("click", (e) => { e.stopPropagation(); cameraInput.click(); });
+    galleryBtn.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
 
     uploadArea.addEventListener("dragover", (e) => {
         e.preventDefault();
@@ -201,6 +205,10 @@
 
     fileInput.addEventListener("change", () => {
         if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    cameraInput.addEventListener("change", () => {
+        if (cameraInput.files.length) handleFile(cameraInput.files[0]);
     });
 
     function handleFile(file) {
@@ -254,6 +262,7 @@
         originalDataUrl = null;
         selectedFile = null;
         fileInput.value = "";
+        cameraInput.value = "";
         uploadArea.classList.remove("hidden");
     });
 
@@ -266,6 +275,7 @@
         selectedFile = null;
         originalDataUrl = null;
         fileInput.value = "";
+        cameraInput.value = "";
         previewContainer.classList.add("hidden");
         cropModal.classList.add("hidden");
         uploadArea.classList.remove("hidden");
