@@ -591,11 +591,7 @@
                         "    <h3>" + escapeHtml(c.pdf_name) + "</h3>" +
                         "    <p>" + c.num_pages + " pages &middot; " + c.num_vectors + " vectors</p>" +
                         "  </div>" +
-                        '  <button class="btn-danger" onclick="removeCatalog(\'' +
-                        escapeHtml(c.pdf_name).replace(/'/g, "\\'") +
-                        "')\">" +
-                        "    Remove" +
-                        "  </button>" +
+
                         "</div>"
                 )
                 .join("");
@@ -606,22 +602,6 @@
             catalogsLoading.classList.add("hidden");
         }
     }
-
-    window.removeCatalog = async function (name) {
-        if (!confirm("Remove catalog \"" + name + "\"? This cannot be undone.")) return;
-
-        try {
-            const res = await fetch("/api/catalogs", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "delete", catalog_name: name }),
-            });
-            if (!res.ok) throw new Error("Delete failed");
-            loadCatalogs();
-        } catch (err) {
-            alert("Failed to remove catalog: " + err.message);
-        }
-    };
 
     // ── Utilities ─────────────────────────────────────────────
     function escapeHtml(str) {

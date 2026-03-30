@@ -11,6 +11,7 @@ Usage:
     python -m src.index_cli list
     python -m src.index_cli add  <path_to_pdf>
     python -m src.index_cli remove <catalog_name>
+    python -m src.index_cli sync
     python -m src.index_cli rebuild
 """
 
@@ -57,7 +58,7 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
     pdf_vectors = 0
 
     for page_num, page_image_path, page_img in pages:
-        # Upload page image to Vercel Blob for public access
+        # Upload page image to R2 for public access
         blob_filename = f"pages/{pdf_name}/{os.path.basename(page_image_path)}"
         page_image_url = upload_page_image(page_img, blob_filename)
         page_w, page_h = page_img.size
@@ -169,6 +170,10 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
         # Flush after each page so progress is saved incrementally
         store.flush()
 
+        # Clean up rendered page image from disk
+        if os.path.exists(page_image_path):
+            os.remove(page_image_path)
+
         if slow and page_num < len(pages):
             time.sleep(2)
 
@@ -255,7 +260,56 @@ def cmd_remove(args):
     print(f"Removed '{catalog_name}' from index ({deleted_blobs} blobs deleted).")
 
 
-def cmd_rebuild(_args):
+def cmd_sync(args):
+    """Index all PDFs in catalogs/ that are not already indexed."""
+    pdf_files = sorted(glob.glob(os.path.join(CATALOGS_DIR, "*.pdf")))
+    if not pdf_files:
+        print(f"No PDF files found in {CATALOGS_DIR}")
+        return
+
+    store = PineconeStore()
+
+    # Determine which catalogs are already indexed
+    existing_catalogs = {c["pdf_name"] for c in store.list_catalogs()}
+    to_index = [p for p in pdf_files if os.path.basename(p) not in existing_catalogs]
+
+    if not to_index:
+        print(f"All {len(pdf_files)} catalog(s) are already indexed. Nothing to do.")
+        return
+
+    skipped = len(pdf_files) - len(to_index)
+    if skipped:
+        print(f"Skipping {skipped} already-indexed catalog(s).")
+
+    os.makedirs(PAGES_DIR, exist_ok=True)
+
+    print(f"\nIndexing {len(to_index)} new catalog(s)...")
+    total_pages = 0
+    total_regions = 0
+    total_vectors = 0
+    pipeline_start = time.time()
+
+    for pdf_idx, pdf_path in enumerate(to_index):
+        pdf_name = os.path.basename(pdf_path)
+        print(f"\n  [{pdf_idx + 1}/{len(to_index)}] {pdf_name}")
+
+        pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
+        total_pages += pages
+        total_regions += regions
+        total_vectors += vectors
+
+    store.close()
+
+    elapsed = time.time() - pipeline_start
+    print(f"\nSync complete in {elapsed:.1f}s")
+    print(f"  New PDFs: {len(to_index)}")
+    print(f"  Skipped:  {skipped}")
+    print(f"  Pages:    {total_pages}")
+    print(f"  Regions:  {total_regions}")
+    print(f"  Vectors:  {total_vectors}")
+
+
+def cmd_rebuild(args):
     """Full rebuild of the index from all PDFs in catalogs/."""
     pdf_files = sorted(glob.glob(os.path.join(CATALOGS_DIR, "*.pdf")))
     if not pdf_files:
@@ -320,6 +374,9 @@ def main():
         help='PDF filename to remove (e.g. "catalog.pdf")',
     )
 
+    p_sync = sub.add_parser("sync", help="Index all new (not yet indexed) catalogs/ PDFs")
+    p_sync.add_argument("--slow", action="store_true", help="Add a 2s pause between pages")
+
     p_rebuild = sub.add_parser("rebuild", help="Full rebuild from all catalogs/ PDFs")
     p_rebuild.add_argument("--slow", action="store_true", help="Add a 2s pause between pages")
 
@@ -329,6 +386,7 @@ def main():
         "list": cmd_list,
         "add": cmd_add,
         "remove": cmd_remove,
+        "sync": cmd_sync,
         "rebuild": cmd_rebuild,
     }
 

@@ -19,8 +19,12 @@ PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "fab-search")
 # HuggingFace Space (Gradio) for CLIP embeddings
 HF_SPACE_ID = os.environ.get("HF_SPACE_ID", "knayirp/fab-search")
 
-# Vercel Blob storage for page images
-BLOB_READ_WRITE_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN", "")
+# Cloudflare R2 storage for page images
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "fab-search")
+R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "")  # e.g. https://pub-xxx.r2.dev
 
 # ── CLIP model (must match what the HF Space serves) ──────────
 CLIP_MODEL_NAME = "ViT-B-32"
