@@ -168,6 +168,47 @@ class PineconeStore:
 
         return results
 
+    def query_raw(
+        self,
+        query_embedding: np.ndarray,
+        fetch_k: int = 200,
+        catalog_filter: list[str] | None = None,
+    ) -> list[dict]:
+        """
+        Fetch the top *fetch_k* matches without page deduplication.
+
+        Used by the reranker, which handles grouping and scoring itself.
+
+        Returns a flat list of dicts with keys:
+            score, pdf_name, page_number,
+            tile_x, tile_y, tile_w, tile_h, page_image
+        """
+        query_kwargs = dict(
+            vector=query_embedding.tolist(),
+            top_k=min(fetch_k, 1000),
+            include_metadata=True,
+        )
+        if catalog_filter:
+            query_kwargs["filter"] = {"pdf_name": {"$in": catalog_filter}}
+
+        response = self.index.query(**query_kwargs)
+
+        results: list[dict] = []
+        for match in response.matches:
+            meta = match.metadata
+            results.append({
+                "score": float(match.score),
+                "pdf_name": meta["pdf_name"],
+                "page_number": meta["page_number"],
+                "tile_x": meta["tile_x"],
+                "tile_y": meta["tile_y"],
+                "tile_w": meta["tile_w"],
+                "tile_h": meta["tile_h"],
+                "page_image": meta["page_image"],
+            })
+
+        return results
+
     # ── Catalog management ────────────────────────────────────
 
     def remove_catalog(self, pdf_name: str) -> int:

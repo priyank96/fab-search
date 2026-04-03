@@ -56,6 +56,18 @@ SIMILARITY_THRESHOLD = 0.75
 # ── Search ────────────────────────────────────────────────────
 TOP_K = 5
 
+# ── Re-ranking ────────────────────────────────────────────────
+# Number of raw tile matches to fetch from Pinecone before re-ranking.
+RERANK_FETCH_K = 200
+# How many top candidates get patch-level feature comparison (~1-2s).
+RERANK_PATCH_CANDIDATES = 30
+# Feature weights (must sum to 1.0).
+W_EMBEDDING = 0.35       # Best tile CLIP cosine similarity
+W_COLOR = 0.20           # HSV histogram correlation
+W_TEXTURE = 0.20         # LBP texture histogram similarity
+W_EDGE = 0.10            # Canny edge density similarity
+W_DOMINANT_COLOR = 0.15  # Top-3 dominant colour match (LAB k-means)
+
 # ── Local paths (for indexing CLI only) ───────────────────────
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CATALOGS_DIR = os.path.join(PROJECT_ROOT, "catalogs")
