@@ -5,6 +5,7 @@ import os
 
 from api.search import router as search_router
 from api.catalogs import router as catalogs_router
+from api.pages import router as pages_router
 
 app = FastAPI(
     title="fab-search",
@@ -15,6 +16,7 @@ app = FastAPI(
 # API routes
 app.include_router(search_router)
 app.include_router(catalogs_router)
+app.include_router(pages_router)
 
 
 @app.get("/api/health")

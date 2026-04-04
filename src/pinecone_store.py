@@ -307,3 +307,62 @@ class PineconeStore:
         found = len(results.matches) > 0
         log.info("has_catalog: pdf_name=%r -> %s", pdf_name, found)
         return found
+
+    # ── Page browsing ─────────────────────────────────────────
+
+    def get_catalog_pages(self, pdf_name: str) -> list[dict]:
+        """
+        Return sorted list of pages for a catalog.
+
+        Each entry: {"page_number": int, "page_image": str}
+        """
+        log.info("get_catalog_pages: pdf_name=%r", pdf_name)
+        dummy_vec = [0.0] * EMBEDDING_DIM
+        results = self.index.query(
+            vector=dummy_vec,
+            top_k=10000,
+            include_metadata=True,
+            filter={"pdf_name": {"$eq": pdf_name}},
+        )
+        pages: dict[int, str] = {}
+        for match in results.matches:
+            meta = match.metadata
+            pn = meta["page_number"]
+            if pn not in pages:
+                pages[pn] = meta.get("page_image", "")
+        return [
+            {"page_number": pn, "page_image": pages[pn]}
+            for pn in sorted(pages)
+        ]
+
+    def get_page_tiles(self, pdf_name: str, page_number: int) -> dict:
+        """
+        Return all tile bounding boxes for a specific page.
+
+        Returns:
+            {"page_image": str, "tiles": [{"tile_x", "tile_y", "tile_w", "tile_h"}, ...]}
+        """
+        log.info("get_page_tiles: pdf_name=%r page=%d", pdf_name, page_number)
+        dummy_vec = [0.0] * EMBEDDING_DIM
+        results = self.index.query(
+            vector=dummy_vec,
+            top_k=10000,
+            include_metadata=True,
+            filter={
+                "pdf_name": {"$eq": pdf_name},
+                "page_number": {"$eq": page_number},
+            },
+        )
+        page_image = ""
+        tiles: list[dict] = []
+        for match in results.matches:
+            meta = match.metadata
+            if not page_image:
+                page_image = meta.get("page_image", "")
+            tiles.append({
+                "tile_x": meta["tile_x"],
+                "tile_y": meta["tile_y"],
+                "tile_w": meta["tile_w"],
+                "tile_h": meta["tile_h"],
+            })
+        return {"page_image": page_image, "tiles": tiles}

@@ -59,6 +59,7 @@
             link.classList.add("active");
 
             if (page === "catalogs") loadCatalogs();
+            if (page === "pages") loadPagesCatalogList();
         });
     });
 
@@ -612,6 +613,270 @@
             catalogsLoading.classList.add("hidden");
         }
     }
+
+    // ── Pages (tile viewer) ───────────────────────────────────
+    const pagesCatalogSelect = document.getElementById("pages-catalog-select");
+    const pagesNav = document.getElementById("pages-nav");
+    const pagesPrev = document.getElementById("pages-prev");
+    const pagesNext = document.getElementById("pages-next");
+    const pagesIndicator = document.getElementById("pages-indicator");
+    const pagesLoading = document.getElementById("pages-loading");
+    const pagesViewer = document.getElementById("pages-viewer");
+    const pagesImage = document.getElementById("pages-image");
+    const pagesCanvas = document.getElementById("pages-canvas");
+    const pagesImageWrap = document.getElementById("pages-image-wrap");
+    const pagesTileCount = document.getElementById("pages-tile-count");
+    const pagesEmpty = document.getElementById("pages-empty");
+
+    let pagesData = [];      // [{page_number, page_image}, ...]
+    let pagesIndex = 0;      // current index into pagesData
+    let pagesTiles = [];     // current page tiles [{tile_x, tile_y, tile_w, tile_h}]
+
+    // Tile overlay colors (cycling)
+    const TILE_COLORS = [
+        { stroke: "#3b82f6", fill: "rgba(59,130,246,0.12)" },
+        { stroke: "#22c55e", fill: "rgba(34,197,94,0.12)" },
+        { stroke: "#eab308", fill: "rgba(234,179,8,0.12)" },
+        { stroke: "#ef4444", fill: "rgba(239,68,68,0.12)" },
+        { stroke: "#a855f7", fill: "rgba(168,85,247,0.12)" },
+        { stroke: "#06b6d4", fill: "rgba(6,182,212,0.12)" },
+    ];
+
+    async function loadPagesCatalogList() {
+        try {
+            const res = await fetch("/api/catalogs");
+            if (!res.ok) return;
+            const data = await res.json();
+
+            pagesCatalogSelect.innerHTML = '<option value="">Select a catalog...</option>' +
+                data.catalogs.map(function (c) {
+                    return '<option value="' + escapeHtml(c.pdf_name) + '">' +
+                        escapeHtml(c.pdf_name) + " (" + c.num_pages + " pages)</option>";
+                }).join("");
+        } catch (_) {}
+    }
+
+    pagesCatalogSelect.addEventListener("change", async function () {
+        var catalog = pagesCatalogSelect.value;
+        pagesNav.classList.add("hidden");
+        pagesViewer.classList.add("hidden");
+        pagesEmpty.classList.add("hidden");
+        pagesData = [];
+        pagesIndex = 0;
+
+        if (!catalog) {
+            pagesEmpty.classList.remove("hidden");
+            return;
+        }
+
+        pagesLoading.classList.remove("hidden");
+        try {
+            var res = await fetch("/api/pages?catalog=" + encodeURIComponent(catalog));
+            if (!res.ok) throw new Error("Failed to load pages");
+            var data = await res.json();
+            pagesData = data.pages;
+            pagesIndex = 0;
+            pagesNav.classList.remove("hidden");
+            updatePagesNav();
+            await loadPageTiles();
+        } catch (err) {
+            pagesViewer.innerHTML = '<p class="empty-state">Error: ' + escapeHtml(err.message) + "</p>";
+            pagesViewer.classList.remove("hidden");
+        } finally {
+            pagesLoading.classList.add("hidden");
+        }
+    });
+
+    pagesPrev.addEventListener("click", async function () {
+        if (pagesIndex > 0) {
+            pagesIndex--;
+            updatePagesNav();
+            await loadPageTiles();
+        }
+    });
+
+    pagesNext.addEventListener("click", async function () {
+        if (pagesIndex < pagesData.length - 1) {
+            pagesIndex++;
+            updatePagesNav();
+            await loadPageTiles();
+        }
+    });
+
+    function updatePagesNav() {
+        pagesIndicator.textContent = (pagesIndex + 1) + " / " + pagesData.length;
+        pagesPrev.disabled = pagesIndex <= 0;
+        pagesNext.disabled = pagesIndex >= pagesData.length - 1;
+    }
+
+    async function loadPageTiles() {
+        var p = pagesData[pagesIndex];
+        if (!p) return;
+
+        pagesLoading.classList.remove("hidden");
+        pagesViewer.classList.add("hidden");
+        try {
+            var catalog = pagesCatalogSelect.value;
+            var res = await fetch("/api/pages?catalog=" + encodeURIComponent(catalog) +
+                "&page=" + p.page_number);
+            if (!res.ok) throw new Error("Failed to load tiles");
+            var data = await res.json();
+
+            pagesTiles = data.tiles;
+            pagesTileCount.textContent = data.total_tiles + " tile" + (data.total_tiles !== 1 ? "s" : "") +
+                " on page " + p.page_number;
+
+            pagesImage.src = data.page_image;
+            pagesImage.onload = function () {
+                drawPageTiles();
+                pagesViewer.classList.remove("hidden");
+                // Reset zoom
+                pagesViewerState.scale = 1;
+                pagesViewerState.x = 0;
+                pagesViewerState.y = 0;
+                applyPagesTransform();
+            };
+        } catch (err) {
+            pagesTileCount.textContent = "Error: " + err.message;
+            pagesViewer.classList.remove("hidden");
+        } finally {
+            pagesLoading.classList.add("hidden");
+        }
+    }
+
+    function drawPageTiles() {
+        var natW = pagesImage.naturalWidth;
+        var natH = pagesImage.naturalHeight;
+        var dispW = pagesImage.clientWidth;
+        var dispH = pagesImage.clientHeight;
+
+        pagesCanvas.width = dispW;
+        pagesCanvas.height = dispH;
+
+        var scaleX = dispW / natW;
+        var scaleY = dispH / natH;
+
+        var ctx = pagesCanvas.getContext("2d");
+        ctx.clearRect(0, 0, dispW, dispH);
+
+        pagesTiles.forEach(function (tile, i) {
+            var color = TILE_COLORS[i % TILE_COLORS.length];
+            var x = tile.tile_x * scaleX;
+            var y = tile.tile_y * scaleY;
+            var w = tile.tile_w * scaleX;
+            var h = tile.tile_h * scaleY;
+
+            // Semi-transparent fill
+            ctx.fillStyle = color.fill;
+            ctx.fillRect(x, y, w, h);
+
+            // Dashed border
+            ctx.strokeStyle = color.stroke;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 3]);
+            ctx.strokeRect(x, y, w, h);
+            ctx.setLineDash([]);
+
+            // Tile index label
+            ctx.fillStyle = color.stroke;
+            ctx.font = "bold 11px -apple-system, sans-serif";
+            var label = String(i + 1);
+            var textW = ctx.measureText(label).width;
+            var pad = 3;
+            ctx.fillStyle = color.stroke;
+            ctx.globalAlpha = 0.85;
+            ctx.fillRect(x, y, textW + pad * 2, 16);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = "#fff";
+            ctx.fillText(label, x + pad, y + 12);
+        });
+    }
+
+    // Redraw tiles on window resize
+    window.addEventListener("resize", function () {
+        if (!pagesViewer.classList.contains("hidden") && pagesTiles.length) {
+            drawPageTiles();
+        }
+    });
+
+    // ── Pages viewer pan & zoom ───────────────────────────────
+    var pagesViewerState = { scale: 1, x: 0, y: 0 };
+    var pagesPointers = new Map();
+    var pagesLastPinchDist = 0;
+    var pagesLastPinchCenter = null;
+    var pagesLastTap = 0;
+
+    function applyPagesTransform() {
+        pagesImageWrap.style.transform =
+            "translate(" + pagesViewerState.x + "px," + pagesViewerState.y + "px) scale(" + pagesViewerState.scale + ")";
+    }
+
+    pagesImageWrap.addEventListener("pointerdown", function (e) {
+        pagesPointers.set(e.pointerId, e);
+        pagesImageWrap.setPointerCapture(e.pointerId);
+
+        if (pagesPointers.size === 2) {
+            var pts = Array.from(pagesPointers.values());
+            pagesLastPinchDist = getDistance(pts[0], pts[1]);
+            pagesLastPinchCenter = getCenter(pts[0], pts[1]);
+        }
+
+        if (pagesPointers.size === 1) {
+            var now = Date.now();
+            if (now - pagesLastTap < 300) {
+                if (pagesViewerState.scale > 1.1) {
+                    pagesViewerState.scale = 1;
+                    pagesViewerState.x = 0;
+                    pagesViewerState.y = 0;
+                } else {
+                    pagesViewerState.scale = 2;
+                }
+                applyPagesTransform();
+                pagesLastTap = 0;
+            } else {
+                pagesLastTap = now;
+            }
+        }
+    });
+
+    pagesImageWrap.addEventListener("pointermove", function (e) {
+        if (!pagesPointers.has(e.pointerId)) return;
+        var prev = pagesPointers.get(e.pointerId);
+        pagesPointers.set(e.pointerId, e);
+
+        if (pagesPointers.size === 1 && pagesViewerState.scale > 1) {
+            pagesViewerState.x += e.clientX - prev.clientX;
+            pagesViewerState.y += e.clientY - prev.clientY;
+            applyPagesTransform();
+        } else if (pagesPointers.size === 2) {
+            var pts = Array.from(pagesPointers.values());
+            var dist = getDistance(pts[0], pts[1]);
+            if (pagesLastPinchDist > 0) {
+                var ratio = dist / pagesLastPinchDist;
+                pagesViewerState.scale = Math.min(5, Math.max(1, pagesViewerState.scale * ratio));
+                applyPagesTransform();
+            }
+            pagesLastPinchDist = dist;
+        }
+    });
+
+    pagesImageWrap.addEventListener("pointerup", function (e) {
+        pagesPointers.delete(e.pointerId);
+        if (pagesPointers.size < 2) { pagesLastPinchDist = 0; pagesLastPinchCenter = null; }
+    });
+
+    pagesImageWrap.addEventListener("pointercancel", function (e) {
+        pagesPointers.delete(e.pointerId);
+        if (pagesPointers.size < 2) { pagesLastPinchDist = 0; pagesLastPinchCenter = null; }
+    });
+
+    pagesImageWrap.addEventListener("wheel", function (e) {
+        e.preventDefault();
+        var delta = e.deltaY > 0 ? 0.9 : 1.1;
+        pagesViewerState.scale = Math.min(5, Math.max(1, pagesViewerState.scale * delta));
+        if (pagesViewerState.scale <= 1) { pagesViewerState.x = 0; pagesViewerState.y = 0; }
+        applyPagesTransform();
+    }, { passive: false });
 
     // ── Utilities ─────────────────────────────────────────────
     function escapeHtml(str) {
