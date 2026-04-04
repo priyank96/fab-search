@@ -728,8 +728,8 @@
 
             pagesImage.src = data.page_image;
             pagesImage.onload = function () {
-                drawPageTiles();
                 pagesViewer.classList.remove("hidden");
+                drawPageTiles();
                 // Reset zoom
                 pagesViewerState.scale = 1;
                 pagesViewerState.x = 0;
