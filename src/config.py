@@ -43,10 +43,11 @@ WHITE_VALUE = 240
 # ── Contour-based segmentation ────────────────────────────────
 MIN_REGION_AREA_FRAC = 0.005
 MAX_REGION_AREA_FRAC = 0.80
-MORPH_KERNEL_SIZE = 15
+MORPH_KERNEL_SIZE = 9
 MERGE_IOU_THRESHOLD = 0.30
 REGION_PADDING = 10
 TILE_FALLBACK_MIN_REGIONS = 1
+
 
 # ── Multi-pattern detection ───────────────────────────────────
 # When a tile's 4 quadrants have pairwise cosine similarity below
