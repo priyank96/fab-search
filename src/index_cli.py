@@ -175,7 +175,7 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
             os.remove(page_image_path)
 
         if slow and page_num < len(pages):
-            time.sleep(2)
+            time.sleep(0.25)
 
     # Flush remaining vectors to Pinecone
     store.flush()
