@@ -50,9 +50,12 @@ def _freeze_all(model: nn.Module) -> None:
 
 
 def _unfreeze_last_block(visual: nn.Module) -> list[nn.Parameter]:
-    """Find the last residual attention block and unfreeze it.
+    """Find the last residual attention block and unfreeze its non-LoRA params.
 
-    open_clip's ViT visual: visual.transformer.resblocks[-1].
+    open_clip's ViT visual: visual.transformer.resblocks[-1]. The block
+    contains the q/k/v/out_proj linears that PEFT has already wrapped
+    with LoRA adapters; we must NOT re-collect those adapter params or
+    the optimiser will see them in two param groups.
     """
     params: list[nn.Parameter] = []
     blocks = getattr(getattr(visual, "transformer", None), "resblocks", None)
@@ -60,10 +63,13 @@ def _unfreeze_last_block(visual: nn.Module) -> list[nn.Parameter]:
         log.warning("Could not locate transformer.resblocks; skipping last-block unfreeze")
         return params
     last = blocks[-1]
-    for p in last.parameters():
+    for name, p in last.named_parameters():
+        if "lora_" in name:
+            # Already trainable via PEFT; do not duplicate.
+            continue
         p.requires_grad = True
         params.append(p)
-    log.info("Unfroze last block: %d params", sum(p.numel() for p in params))
+    log.info("Unfroze last block (excl. LoRA): %d params", sum(p.numel() for p in params))
     return params
 
 

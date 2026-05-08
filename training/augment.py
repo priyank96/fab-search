@@ -72,7 +72,6 @@ def build_train_transform() -> A.Compose:
             A.Perspective(
                 scale=PERSPECTIVE_DISTORTION,
                 keep_size=True,
-                pad_mode=cv2.BORDER_REPLICATE,
                 fit_output=False,
                 p=0.5,
             ),
