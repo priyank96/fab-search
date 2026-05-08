@@ -60,16 +60,52 @@ def _iter_vector_ids(index) -> Iterable[str]:
         yield m.id
 
 
-def _fetch_metadata(index, ids: list[str]) -> list[dict]:
-    """Fetch metadata for a batch of vector IDs."""
+def _fetch_metadata(index, ids: list[str], _debug: list[bool] = [True]) -> list[dict]:
+    """Fetch metadata for a batch of vector IDs.
+
+    The Pinecone client has shifted shapes a few times: response may be a
+    FetchResponse object with `.vectors`, a dict, or expose `.to_dict()`.
+    Vectors themselves may be `Vector` objects with `.metadata`/`.id` or
+    plain dicts. Handle all of them.
+    """
     rows: list[dict] = []
     for i in range(0, len(ids), FETCH_BATCH):
         batch = ids[i : i + FETCH_BATCH]
         resp = index.fetch(ids=batch)
-        # Pinecone client returns either dict-like or attribute-like; handle both.
-        vectors = getattr(resp, "vectors", None) or resp.get("vectors", {})
+
+        vectors = None
+        if hasattr(resp, "vectors"):
+            vectors = resp.vectors
+        elif isinstance(resp, dict):
+            vectors = resp.get("vectors")
+        elif hasattr(resp, "to_dict"):
+            vectors = resp.to_dict().get("vectors")
+
+        if _debug[0]:
+            log.info("fetch() response type=%s vectors type=%s len=%s",
+                     type(resp).__name__,
+                     type(vectors).__name__,
+                     (len(vectors) if hasattr(vectors, "__len__") else "?"))
+            if vectors:
+                first_id = next(iter(vectors))
+                first_val = vectors[first_id]
+                log.info("first vector type=%s sample=%r",
+                         type(first_val).__name__,
+                         (first_val if isinstance(first_val, dict)
+                          else {k: getattr(first_val, k, None)
+                                for k in ("id", "metadata")}))
+            _debug[0] = False
+
+        if not vectors:
+            continue
         for vid, vec in vectors.items():
-            meta = getattr(vec, "metadata", None) or vec.get("metadata", {})
+            meta = None
+            if isinstance(vec, dict):
+                meta = vec.get("metadata")
+            else:
+                meta = getattr(vec, "metadata", None)
+                if meta is None and hasattr(vec, "to_dict"):
+                    meta = vec.to_dict().get("metadata")
             if not meta:
                 continue
             rows.append({"id": vid, **meta})
