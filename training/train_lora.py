@@ -25,6 +25,7 @@ from training.config import (
     BATCH_SIZE,
     CHECKPOINT_DIR,
     EARLY_STOP_PATIENCE,
+    MIN_EPOCHS_BEFORE_STOP,
     EPOCHS,
     GRAD_CLIP,
     MANIFEST_PATH,
@@ -127,7 +128,8 @@ def main() -> None:
     if wandb:
         wandb.log({f"baseline/{k}": v for k, v in base_metrics.items()})
 
-    best_r5 = base_metrics.get("recall@5", 0.0)
+    baseline_r5 = base_metrics.get("recall@5", 0.0)
+    best_r5 = -1.0  # best among TRAINED epochs (not baseline) — stops the FT-below-baseline pitfall
     best_path = CHECKPOINT_DIR / "best.pt"
     patience = 0
     global_step = 0
@@ -206,11 +208,16 @@ def main() -> None:
         else:
             patience += 1
             log.info("No improvement (%d/%d).", patience, EARLY_STOP_PATIENCE)
-            if patience >= EARLY_STOP_PATIENCE:
+            if epoch + 1 < MIN_EPOCHS_BEFORE_STOP:
+                log.info("Below MIN_EPOCHS_BEFORE_STOP=%d; not stopping yet.", MIN_EPOCHS_BEFORE_STOP)
+            elif patience >= EARLY_STOP_PATIENCE:
                 log.info("Early stopping.")
                 break
 
-    log.info("Training done. Best Recall@5: %.4f -> %s", best_r5, best_path)
+    log.info("Training done. Best Recall@5 (trained): %.4f  Baseline: %.4f  -> %s",
+             best_r5, baseline_r5, best_path)
+    if best_r5 < baseline_r5:
+        log.warning("Best trained checkpoint is BELOW pretrained baseline — do not deploy.")
 
 
 if __name__ == "__main__":

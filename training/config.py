@@ -67,11 +67,15 @@ BATCH_SIZE = int(os.environ.get("TRAIN_BATCH_SIZE", "128"))
 NUM_WORKERS = int(os.environ.get("TRAIN_NUM_WORKERS", "4"))
 EPOCHS = int(os.environ.get("TRAIN_EPOCHS", "10"))
 WARMUP_STEPS = 500
-LR_LORA = 1e-4          # LoRA + last block
-LR_PROJ = 5e-5          # visual.proj
+# LRs are roughly tuned for BS=128. Scale by sqrt(BS/128) for larger batches:
+#   BS=256 → ×1.41   BS=512 → ×2.0   BS=768 → ×2.45   BS=1024 → ×2.83
+# Override by setting LR_LORA / LR_PROJ env vars or editing here.
+LR_LORA = float(os.environ.get("LR_LORA", "1e-4"))   # LoRA + last block
+LR_PROJ = float(os.environ.get("LR_PROJ", "5e-5"))   # visual.proj
 WEIGHT_DECAY = 0.05
 GRAD_CLIP = 1.0
-EARLY_STOP_PATIENCE = 2  # epochs without val Recall@5 improvement
+EARLY_STOP_PATIENCE = int(os.environ.get("EARLY_STOP_PATIENCE", "3"))  # epochs w/o val Recall@5 improvement (over best trained epoch)
+MIN_EPOCHS_BEFORE_STOP = int(os.environ.get("MIN_EPOCHS_BEFORE_STOP", "4"))  # never early-stop before this many epochs (LoRA needs to recover from init dip)
 
 # Hard-negative sampling
 HARD_NEG_FRAC = 0.5     # fraction of batch biased to share pdf_name
