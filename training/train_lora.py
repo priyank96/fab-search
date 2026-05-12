@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import random
 from pathlib import Path
 
@@ -98,6 +99,24 @@ def main() -> None:
     )
 
     encoder, param_groups = build_model(device)
+
+    # ── Optional resume: load encoder weights from a prior checkpoint ──
+    # Optimizer/scheduler state is NOT restored. Use WARMUP_STEPS=0 and
+    # lower LRs for continuation runs.
+    resume_path = os.environ.get("RESUME_FROM", "").strip()
+    if resume_path:
+        rp = Path(resume_path)
+        if not rp.exists():
+            raise SystemExit(f"RESUME_FROM not found: {rp}")
+        ckpt = torch.load(rp, map_location=device)
+        missing, unexpected = encoder.load_state_dict(ckpt["encoder_state"], strict=False)
+        log.info("Resumed encoder from %s (epoch=%s, val_metrics=%s)",
+                 rp, ckpt.get("epoch"), ckpt.get("val_metrics"))
+        if missing:
+            log.warning("Missing keys on resume: %d (first 3: %s)", len(missing), missing[:3])
+        if unexpected:
+            log.warning("Unexpected keys on resume: %d (first 3: %s)", len(unexpected), unexpected[:3])
+
     optim = torch.optim.AdamW(param_groups)
     # Snapshot the configured LR per group so the cosine schedule has a
     # stable base to scale from each step.
