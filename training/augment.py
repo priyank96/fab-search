@@ -57,10 +57,33 @@ def _enforce_short_side_floor(img: np.ndarray) -> np.ndarray:
     return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
 
 
+def _crop_top_band(image: np.ndarray, **_) -> np.ndarray:
+    """Keep the top ~60% of the image (biases downstream crop toward top edge)."""
+    h = image.shape[0]
+    return image[: max(1, int(h * 0.6)), :, :]
+
+
+def _crop_bottom_band(image: np.ndarray, **_) -> np.ndarray:
+    """Keep the bottom ~60% of the image (biases downstream crop toward bottom edge)."""
+    h = image.shape[0]
+    return image[int(h * 0.4) :, :, :]
+
+
 def build_train_transform() -> A.Compose:
     """Two-view pipeline applied independently per call."""
     return A.Compose(
         [
+            # Edge-biased pre-crop: ~30% of views are restricted to the top
+            # or bottom band before RandomResizedCrop, so the model sees
+            # patches whose centre is near a patch edge (mirrors how users
+            # photograph the top/bottom of a fabric sample on a page).
+            A.OneOf(
+                [
+                    A.Lambda(image=_crop_top_band),
+                    A.Lambda(image=_crop_bottom_band),
+                ],
+                p=0.30,
+            ),
             # Geometry
             A.RandomResizedCrop(
                 size=(INPUT_SIZE, INPUT_SIZE),
