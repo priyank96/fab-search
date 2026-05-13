@@ -158,10 +158,20 @@ def build_eval_transform() -> A.Compose:
 
 def build_query_aug() -> A.Compose:
     """Single-pass 'phone-like' augmentation used to synthesise queries
-    for the proxy retrieval eval. Same family as train, but with p=1.0
-    on perspective+blur+jpeg so the result is reliably degraded."""
+    for the proxy retrieval eval. Harsher version that mirrors the train
+    augmentation regime so eval actually exercises the new invariances
+    (large rotation, colour shifts, edge-biased crops)."""
     return A.Compose(
         [
+            # Edge-biased pre-crop (matches train): 30% of queries are
+            # restricted to the top or bottom band of the patch.
+            A.OneOf(
+                [
+                    A.Lambda(image=_crop_top_band),
+                    A.Lambda(image=_crop_bottom_band),
+                ],
+                p=0.30,
+            ),
             A.RandomResizedCrop(
                 size=(INPUT_SIZE, INPUT_SIZE),
                 scale=CROP_SCALE,
@@ -170,11 +180,24 @@ def build_query_aug() -> A.Compose:
                 p=1.0,
             ),
             A.Perspective(scale=PERSPECTIVE_DISTORTION, keep_size=True, p=1.0),
-            A.Rotate(limit=TILT_DEGREES, p=0.7),
+            A.Rotate(
+                limit=180,                       # was TILT_DEGREES (3°)
+                interpolation=cv2.INTER_AREA,
+                border_mode=cv2.BORDER_REPLICATE,
+                p=0.9,
+            ),
             A.MotionBlur(blur_limit=(3, 5), p=0.6),
             A.RandomBrightnessContrast(
                 brightness_limit=BRIGHTNESS, contrast_limit=CONTRAST, p=1.0
             ),
+            A.ColorJitter(
+                brightness=0.0,
+                contrast=0.0,
+                saturation=0.50,                 # stronger colour shift
+                hue=0.10,
+                p=0.8,
+            ),
+            A.ToGray(p=0.15),                    # exercise colour-invariance
             A.ImageCompression(quality_range=JPEG_QUALITY, p=1.0),
             A.Normalize(mean=NORM_MEAN, std=NORM_STD),
         ]
