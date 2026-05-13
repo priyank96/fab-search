@@ -103,15 +103,39 @@ def main() -> None:
     # ── Optional resume: load encoder weights from a prior checkpoint ──
     # Optimizer/scheduler state is NOT restored. Use WARMUP_STEPS=0 and
     # lower LRs for continuation runs.
+    #
+    # RESUME_FROM accepts:
+    #   - local path to a training checkpoint (has "encoder_state")
+    #   - local path to an exported checkpoint (has "model_state")
+    #   - HF model repo id like "user/repo" (downloads RESUME_FILE,
+    #     default "fab_search_vit_b32.pt", which is an exported ckpt)
     resume_path = os.environ.get("RESUME_FROM", "").strip()
     if resume_path:
         rp = Path(resume_path)
+        if not rp.exists() and "/" in resume_path and "\\" not in resume_path and not resume_path.startswith("."):
+            # Treat as HF repo id
+            from huggingface_hub import hf_hub_download
+            hf_file = os.environ.get("RESUME_FILE", "fab_search_vit_b32.pt")
+            log.info("Downloading %s from HF repo %s ...", hf_file, resume_path)
+            rp = Path(hf_hub_download(repo_id=resume_path, filename=hf_file, repo_type="model"))
         if not rp.exists():
             raise SystemExit(f"RESUME_FROM not found: {rp}")
+
         ckpt = torch.load(rp, map_location=device)
-        missing, unexpected = encoder.load_state_dict(ckpt["encoder_state"], strict=False)
-        log.info("Resumed encoder from %s (epoch=%s, val_metrics=%s)",
-                 rp, ckpt.get("epoch"), ckpt.get("val_metrics"))
+        if "encoder_state" in ckpt:
+            # Training checkpoint: load directly into peft-wrapped encoder.
+            missing, unexpected = encoder.load_state_dict(ckpt["encoder_state"], strict=False)
+            log.info("Resumed (training ckpt) from %s (epoch=%s, val_metrics=%s)",
+                     rp, ckpt.get("epoch"), ckpt.get("val_metrics"))
+        elif "model_state" in ckpt or "state_dict" in ckpt:
+            # Exported (merged) checkpoint: weights belong to the *base* open_clip
+            # model, not the peft wrapper. Rebuild the encoder with merged weights
+            # pre-loaded, then re-wrap with fresh LoRA adapters.
+            log.info("Detected exported checkpoint; rebuilding model with merged weights")
+            encoder, param_groups = build_model(device, init_visual_from=str(rp))
+            missing, unexpected = [], []
+        else:
+            raise SystemExit(f"Unrecognised checkpoint format: keys={list(ckpt.keys())[:5]}")
         if missing:
             log.warning("Missing keys on resume: %d (first 3: %s)", len(missing), missing[:3])
         if unexpected:

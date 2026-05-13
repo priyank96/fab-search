@@ -84,10 +84,28 @@ def _unfreeze_proj(visual: nn.Module) -> list[nn.Parameter]:
     return [proj]
 
 
-def build_model(device: torch.device) -> tuple[ImageEncoder, list[dict[str, Any]]]:
-    """Returns (encoder, optimizer_param_groups)."""
+def build_model(
+    device: torch.device,
+    init_visual_from: str | None = None,
+) -> tuple[ImageEncoder, list[dict[str, Any]]]:
+    """Returns (encoder, optimizer_param_groups).
+
+    If ``init_visual_from`` is given, it must be a path to an exported
+    checkpoint (``training.export``) whose ``model_state`` will be loaded
+    into the fresh open_clip model BEFORE LoRA wrapping. This lets us
+    continue training from a merged finetune.
+    """
     log.info("Loading open_clip %s / %s ...", MODEL_NAME, PRETRAINED)
     model, _, _ = open_clip.create_model_and_transforms(MODEL_NAME, pretrained=PRETRAINED)
+
+    if init_visual_from:
+        log.info("Initialising from merged checkpoint: %s", init_visual_from)
+        ckpt = torch.load(init_visual_from, map_location="cpu")
+        merged = ckpt.get("model_state") or ckpt.get("state_dict") or ckpt
+        missing, unexpected = model.load_state_dict(merged, strict=False)
+        log.info("Loaded merged weights (missing=%d unexpected=%d)", len(missing), len(unexpected))
+        if unexpected:
+            log.warning("Unexpected keys (first 3): %s", unexpected[:3])
 
     # Image-only: drop text components to free memory and prevent accidental use.
     for attr in ("transformer", "token_embedding", "positional_embedding", "ln_final", "text_projection"):
