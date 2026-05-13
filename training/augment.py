@@ -76,10 +76,10 @@ def build_train_transform() -> A.Compose:
                 p=0.5,
             ),
             A.Rotate(
-                limit=TILT_DEGREES,
+                limit=180,
                 interpolation=cv2.INTER_AREA,
                 border_mode=cv2.BORDER_REPLICATE,
-                p=0.5,
+                p=0.7,
             ),
 
             # Blur (light, gated)
@@ -101,10 +101,13 @@ def build_train_transform() -> A.Compose:
             A.ColorJitter(
                 brightness=0.0,
                 contrast=0.0,
-                saturation=0.2,
-                hue=0.04,
-                p=0.5,
+                saturation=0.50,   # was 0.20 — stronger colour invariance
+                hue=0.10,          # was 0.04 — stronger colour invariance
+                p=0.7,             # was 0.5
             ),
+            # Force a fraction of views to be greyscale so the model can't
+            # rely on colour as a shortcut for "same patch".
+            A.ToGray(p=0.15),
             A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=CLAHE_PROB),
 
             # Capture artifacts
