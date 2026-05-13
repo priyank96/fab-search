@@ -63,10 +63,13 @@ RERANK_FETCH_K = 200
 # How many top candidates get patch-level feature comparison (~1-2s).
 RERANK_PATCH_CANDIDATES = 30
 # Feature weights (must sum to 1.0).
-W_EMBEDDING = 0.35       # Best tile CLIP cosine similarity
+# Bumped after fine-tuning ViT-B-32 on FabSearch patches: the embedding now
+# captures pattern structure that LBP/edge density used to compensate for,
+# so we trust it more and reduce the texture/edge crutches.
+W_EMBEDDING = 0.50       # Best tile CLIP cosine similarity (finetuned)
 W_COLOR = 0.20           # HSV histogram correlation
-W_TEXTURE = 0.20         # LBP texture histogram similarity
-W_EDGE = 0.10            # Canny edge density similarity
+W_TEXTURE = 0.10         # LBP texture histogram similarity
+W_EDGE = 0.05            # Canny edge density similarity
 W_DOMINANT_COLOR = 0.15  # Top-3 dominant colour match (LAB k-means)
 
 # ── Local paths (for indexing CLI only) ───────────────────────
