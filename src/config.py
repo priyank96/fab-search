@@ -63,15 +63,18 @@ RERANK_FETCH_K = 100
 # How many top candidates get patch-level feature comparison (~1-2s).
 RERANK_PATCH_CANDIDATES = 30
 # Feature weights (must sum to 1.0).
-# TEMPORARY: embedding-only mode to evaluate the finetuned model in isolation.
-# Restore the multi-feature blend below once we've A/B'd it.
-W_EMBEDDING = 1.00
-W_COLOR = 0.00
-W_TEXTURE = 0.00
-W_EDGE = 0.00
-W_DOMINANT_COLOR = 0.00
-# Previous (post-finetune) blend, kept for easy revert:
-# W_EMBEDDING=0.50  W_COLOR=0.20  W_TEXTURE=0.10  W_EDGE=0.05  W_DOMINANT_COLOR=0.15
+# After finetuning, the embedding over-indexes on colour. Re-introduce the
+# colour-invariant hand-crafted signals (LBP texture + Canny edges) to
+# counterbalance, but leave HSV/dominant-colour OFF so we don't double-count.
+W_EMBEDDING = 0.70
+W_COLOR = 0.00           # OFF: model already over-uses colour
+W_TEXTURE = 0.20         # LBP — colour-invariant pattern structure
+W_EDGE = 0.10            # Canny edge density — colour-invariant
+W_DOMINANT_COLOR = 0.00  # OFF: model already over-uses colour
+# Previous combos kept for easy revert:
+# Embedding-only:   1.00 / 0.00 / 0.00 / 0.00 / 0.00
+# Post-finetune v1: 0.50 / 0.20 / 0.10 / 0.05 / 0.15
+# Original:         0.35 / 0.20 / 0.20 / 0.10 / 0.15
 
 # ── Local paths (for indexing CLI only) ───────────────────────
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
