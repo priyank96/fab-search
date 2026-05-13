@@ -227,6 +227,26 @@ def rerank(
     # Pre-sort by embedding score so patch comparison targets the best
     candidates.sort(key=lambda c: c["max_score"], reverse=True)
 
+    # ── Fast-path: embedding-only ────────────────────────────
+    # When the embedding fully owns the ranking, skip tile downloads and
+    # feature extraction entirely (saves ~1-2s per query).
+    if W_EMBEDDING >= 0.9999 and (W_COLOR + W_TEXTURE + W_EDGE + W_DOMINANT_COLOR) <= 1e-6:
+        log.info("Embedding-only mode (W_EMBEDDING=%.2f); skipping phase 2", W_EMBEDDING)
+        results: list[dict] = []
+        for c in candidates[:top_k]:
+            bt = c["best_tile"]
+            results.append({
+                "rank": len(results) + 1,
+                "score": round(c["max_score"], 4),
+                "embedding_score": round(c["max_score"], 4),
+                "color_score": 0.0,
+                "texture_score": 0.0,
+                "edge_score": 0.0,
+                "dominant_color_score": 0.0,
+                **{k: bt[k] for k in ("pdf_name", "page_number", "tile_x", "tile_y", "tile_w", "tile_h", "page_image")},
+            })
+        return results
+
     # ── Phase 2: Patch-level feature comparison ──────────────
 
     # Precompute query features once
