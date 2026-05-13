@@ -59,11 +59,11 @@ TOP_K = 5
 
 # ── Re-ranking ────────────────────────────────────────────────
 # Number of raw tile matches to fetch from Pinecone before re-ranking.
-RERANK_FETCH_K = 100
+RERANK_FETCH_K = 60
 # How many top candidates get patch-level feature comparison. Set equal to
 # RERANK_FETCH_K to rerank every fetched candidate (slower: each candidate
 # triggers a tile-image download + LBP/edge/colour compute).
-RERANK_PATCH_CANDIDATES = 100
+RERANK_PATCH_CANDIDATES = 60
 # Feature weights (must sum to 1.0).
 # After finetuning, the embedding over-indexes on colour. Re-introduce the
 # colour-invariant hand-crafted signals (LBP texture + Canny edges) to
