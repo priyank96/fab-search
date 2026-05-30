@@ -21,7 +21,9 @@ import sys
 import glob
 import time
 import io
+import shutil
 import argparse
+from datetime import datetime, timezone
 
 from src.config import (
     CATALOGS_DIR, PAGES_DIR, DPI,
@@ -39,6 +41,17 @@ from src.pinecone_store import PineconeStore
 from src.blob_store import upload_page_image, delete_catalog_blobs
 
 
+def _cleanup_pages_dir() -> None:
+    """Remove the local rendered-page directory created during indexing.
+
+    Pages are removed incrementally during indexing, but this guarantees no
+    leftover files (e.g. from an interrupted run) remain on disk afterwards.
+    """
+    if os.path.isdir(PAGES_DIR):
+        shutil.rmtree(PAGES_DIR, ignore_errors=True)
+        print(f"Cleaned up local page files in {PAGES_DIR}")
+
+
 def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) -> tuple[int, int, int]:
     """
     Run the indexing pipeline for a single PDF.
@@ -47,6 +60,9 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
         (num_pages, num_regions, num_vectors)
     """
     pdf_name = os.path.basename(pdf_path)
+
+    # One timestamp per indexing run so all vectors from this PDF share it.
+    indexed_at = datetime.now(timezone.utc).isoformat()
 
     # Render PDF pages to disk (for later reference / upload)
     t1 = time.time()
@@ -75,6 +91,7 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
             tile_w=page_w,
             tile_h=page_h,
             page_image=page_image_url,
+            indexed_at=indexed_at,
         )
         page_vectors = 1
 
@@ -116,6 +133,7 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
                             tile_w=dw,
                             tile_h=dh,
                             page_image=page_image_url,
+                            indexed_at=indexed_at,
                         )
                         page_vectors += 1
                 else:
@@ -130,6 +148,7 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
                         tile_w=tw,
                         tile_h=th,
                         page_image=page_image_url,
+                        indexed_at=indexed_at,
                     )
                     page_vectors += 1
 
@@ -156,6 +175,7 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
                     tile_w=rw,
                     tile_h=rh,
                     page_image=page_image_url,
+                    indexed_at=indexed_at,
                 )
                 page_vectors += 1
 
@@ -227,10 +247,12 @@ def cmd_add(args):
 
     print(f"\nIndexing: {pdf_name}")
     t0 = time.time()
-    pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
+    try:
+        pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
+    finally:
+        store.close()
+        _cleanup_pages_dir()
     elapsed = time.time() - t0
-
-    store.close()
 
     print(f"\nDone in {elapsed:.1f}s")
     print(f"  Pages:   {pages}")
@@ -289,16 +311,18 @@ def cmd_sync(args):
     total_vectors = 0
     pipeline_start = time.time()
 
-    for pdf_idx, pdf_path in enumerate(to_index):
-        pdf_name = os.path.basename(pdf_path)
-        print(f"\n  [{pdf_idx + 1}/{len(to_index)}] {pdf_name}")
+    try:
+        for pdf_idx, pdf_path in enumerate(to_index):
+            pdf_name = os.path.basename(pdf_path)
+            print(f"\n  [{pdf_idx + 1}/{len(to_index)}] {pdf_name}")
 
-        pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
-        total_pages += pages
-        total_regions += regions
-        total_vectors += vectors
-
-    store.close()
+            pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
+            total_pages += pages
+            total_regions += regions
+            total_vectors += vectors
+    finally:
+        store.close()
+        _cleanup_pages_dir()
 
     elapsed = time.time() - pipeline_start
     print(f"\nSync complete in {elapsed:.1f}s")
@@ -334,16 +358,18 @@ def cmd_rebuild(args):
     total_vectors = 0
     pipeline_start = time.time()
 
-    for pdf_idx, pdf_path in enumerate(pdf_files):
-        pdf_name = os.path.basename(pdf_path)
-        print(f"\n  [{pdf_idx + 1}/{len(pdf_files)}] {pdf_name}")
+    try:
+        for pdf_idx, pdf_path in enumerate(pdf_files):
+            pdf_name = os.path.basename(pdf_path)
+            print(f"\n  [{pdf_idx + 1}/{len(pdf_files)}] {pdf_name}")
 
-        pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
-        total_pages += pages
-        total_regions += regions
-        total_vectors += vectors
-
-    store.close()
+            pages, regions, vectors = index_single_pdf(pdf_path, store, slow=args.slow)
+            total_pages += pages
+            total_regions += regions
+            total_vectors += vectors
+    finally:
+        store.close()
+        _cleanup_pages_dir()
 
     elapsed = time.time() - pipeline_start
     print(f"\nIndexing complete in {elapsed:.1f}s")

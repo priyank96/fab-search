@@ -121,18 +121,17 @@ def encode_image(pil_image: Image.Image) -> np.ndarray:
     """
     img = pil_image.convert("RGB")
 
-    # Downscale to max 512px on longest side before uploading — CLIP (ViT-B-32)
-    # resizes to 224×224 internally, so larger images waste network bandwidth.
-    max_side = 512
-    if max(img.size) > max_side:
-        img.thumbnail((max_side, max_side), Image.LANCZOS)
-
+    # Send the full-resolution image as lossless PNG. The Space performs the
+    # only resize (INTER_AREA → 224) so this matches the training eval path,
+    # which operated on full-res crops with no client-side downscale or JPEG.
+    # Avoid a client-side LANCZOS pre-shrink or JPEG compression here — both
+    # introduce artifacts the fine-tuned model never saw during training.
     log.debug("Image to encode: size=%s", img.size)
 
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=85)
+    img.save(buf, format="PNG")
     img_bytes = buf.getvalue()
-    log.debug("JPEG size: %d bytes", len(img_bytes))
+    log.debug("PNG size: %d bytes", len(img_bytes))
 
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):

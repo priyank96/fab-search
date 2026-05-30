@@ -19,6 +19,8 @@ Pinecone metadata fields per vector:
 
 import uuid
 import logging
+from datetime import datetime, timezone
+
 import numpy as np
 from pinecone import Pinecone
 
@@ -61,6 +63,7 @@ class PineconeStore:
         tile_w: int,
         tile_h: int,
         page_image: str,
+        indexed_at: str | None = None,
     ) -> str:
         """
         Stage a vector + metadata for upsert.
@@ -80,6 +83,7 @@ class PineconeStore:
                 "tile_w": tile_w,
                 "tile_h": tile_h,
                 "page_image": page_image,
+                "indexed_at": indexed_at or datetime.now(timezone.utc).isoformat(),
             },
         })
 
