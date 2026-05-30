@@ -213,6 +213,75 @@ main {
     accent-color: var(--accent);
 }
 
+/* ── Debug toggle & score breakdown ─────────────── */
+
+.debug-toggle {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.debug-toggle input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.debug-summary {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.25rem;
+    line-height: 1.5;
+}
+
+.score-breakdown {
+    border-top: 1px solid var(--border);
+    padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.score-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.score-table th,
+.score-table td {
+    text-align: right;
+    padding: 0.2rem 0.35rem;
+}
+
+.score-table th:first-child,
+.score-table td:first-child {
+    text-align: left;
+}
+
+.score-table thead th {
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+
+.score-table tbody tr.off {
+    color: var(--text-muted);
+    opacity: 0.55;
+}
+
+.score-table tfoot td {
+    border-top: 1px solid var(--border);
+    font-weight: 700;
+    padding-top: 0.35rem;
+}
+
 .btn-primary {
     background: var(--accent);
     color: #fff;

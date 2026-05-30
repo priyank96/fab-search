@@ -8,7 +8,15 @@ import io
 from fastapi import APIRouter, UploadFile, File, Query
 from PIL import Image
 
-from src.config import TOP_K, RERANK_FETCH_K
+from src.config import (
+    TOP_K,
+    RERANK_FETCH_K,
+    W_EMBEDDING,
+    W_COLOR,
+    W_TEXTURE,
+    W_EDGE,
+    W_DOMINANT_COLOR,
+)
 from src.embedding_client import encode_image
 from src.pinecone_store import PineconeStore
 from src.reranker import rerank
@@ -45,4 +53,19 @@ async def search(
     # Re-rank using embedding score aggregation, tile coverage, and color similarity
     results = rerank(raw_matches, query_image, top_k=top_k)
 
-    return {"results": results, "total": len(results)}
+    return {
+        "results": results,
+        "total": len(results),
+        # Active re-ranking weights — surfaced so the UI debug view can show
+        # each factor's weighted contribution to the composite score.
+        "weights": {
+            "embedding": W_EMBEDDING,
+            "color": W_COLOR,
+            "texture": W_TEXTURE,
+            "edge": W_EDGE,
+            "dominant_color": W_DOMINANT_COLOR,
+        },
+        # How many raw tile candidates were considered before re-ranking.
+        "fetch_k": RERANK_FETCH_K,
+        "candidates": len(raw_matches),
+    }

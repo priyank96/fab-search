@@ -17,6 +17,7 @@
     const searchBtn = document.getElementById("search-btn");
     const loading = document.getElementById("loading");
     const resultsContainer = document.getElementById("results");
+    const debugMode = document.getElementById("debug-mode");
 
     const cropModal = document.getElementById("crop-modal");
     const cropImage = document.getElementById("crop-image");
@@ -47,6 +48,16 @@
     let allCatalogNames = [];
     let selectedCatalogs = new Set();
     const TEMPLATE_KEY = "fab-search-collections";
+
+    // Debug view state — last search response is cached so toggling debug
+    // re-renders without re-querying.
+    const DEBUG_KEY = "fab-search-debug";
+    let lastSearchData = null;
+    debugMode.checked = localStorage.getItem(DEBUG_KEY) === "1";
+    debugMode.addEventListener("change", () => {
+        localStorage.setItem(DEBUG_KEY, debugMode.checked ? "1" : "0");
+        if (lastSearchData) renderResults(lastSearchData);
+    });
 
     // ── Navigation ────────────────────────────────────────────
     document.querySelectorAll(".nav-links a").forEach((link) => {
@@ -317,8 +328,10 @@
             }
 
             const data = await res.json();
-            renderResults(data.results);
+            lastSearchData = data;
+            renderResults(data);
         } catch (err) {
+            lastSearchData = null;
             resultsContainer.innerHTML =
                 '<p class="empty-state">Error: ' + escapeHtml(err.message) + "</p>";
         } finally {
@@ -327,34 +340,101 @@
         }
     });
 
-    function renderResults(results) {
+    function renderResults(data) {
+        const results = (data && data.results) || [];
+        const weights = (data && data.weights) || {};
+
         if (!results.length) {
             resultsContainer.innerHTML = '<p class="empty-state">No matches found.</p>';
             return;
         }
 
-        resultsContainer.innerHTML = results
-            .map(
-                (r) =>
-                    '<div class="result-card">' +
-                    '  <div class="result-image-wrap">' +
-                    '    <img src="' + escapeHtml(r.page_image) + '" alt="Page ' + r.page_number + '"' +
-                    '         data-tile-x="' + r.tile_x + '" data-tile-y="' + r.tile_y + '"' +
-                    '         data-tile-w="' + r.tile_w + '" data-tile-h="' + r.tile_h + '"' +
-                    '         onload="drawHighlight(this)">' +
-                    '    <canvas></canvas>' +
-                    '    <span class="result-rank">' + r.rank + "</span>" +
-                    '    <span class="result-score">' + (r.score * 100).toFixed(1) + "%</span>" +
-                    "  </div>" +
-                    '  <div class="result-meta">' +
-                    '    <div><span class="label">Catalog</span><br><span class="value">' +
-                    escapeHtml(r.pdf_name) + "</span></div>" +
-                    '    <div><span class="label">Page</span><br><span class="value">' +
-                    r.page_number + "</span></div>" +
-                    "  </div>" +
-                    "</div>"
+        const debug = debugMode.checked;
+
+        let html = "";
+        if (debug) {
+            html +=
+                '<div class="debug-summary">' +
+                "Considered " + (data.candidates != null ? data.candidates : "?") +
+                " raw tile candidates (fetch_k=" + (data.fetch_k != null ? data.fetch_k : "?") + "). " +
+                "Weights — " +
+                "emb " + fmtW(weights.embedding) + ", " +
+                "texture " + fmtW(weights.texture) + ", " +
+                "edge " + fmtW(weights.edge) + ", " +
+                "color " + fmtW(weights.color) + ", " +
+                "dom-color " + fmtW(weights.dominant_color) +
+                "</div>";
+        }
+
+        html += results
+            .map((r) =>
+                '<div class="result-card">' +
+                '  <div class="result-image-wrap">' +
+                '    <img src="' + escapeHtml(r.page_image) + '" alt="Page ' + r.page_number + '"' +
+                '         data-tile-x="' + r.tile_x + '" data-tile-y="' + r.tile_y + '"' +
+                '         data-tile-w="' + r.tile_w + '" data-tile-h="' + r.tile_h + '"' +
+                '         onload="drawHighlight(this)">' +
+                '    <canvas></canvas>' +
+                '    <span class="result-rank">' + r.rank + "</span>" +
+                '    <span class="result-score">' + (r.score * 100).toFixed(1) + "%</span>" +
+                "  </div>" +
+                '  <div class="result-meta">' +
+                '    <div><span class="label">Catalog</span><br><span class="value">' +
+                escapeHtml(r.pdf_name) + "</span></div>" +
+                '    <div><span class="label">Page</span><br><span class="value">' +
+                r.page_number + "</span></div>" +
+                "  </div>" +
+                (debug ? renderScoreBreakdown(r, weights) : "") +
+                "</div>"
             )
             .join("");
+
+        resultsContainer.innerHTML = html;
+    }
+
+    function fmtW(w) {
+        return w == null ? "?" : Number(w).toFixed(2);
+    }
+
+    // Build a per-factor score breakdown table. Shows the raw similarity for
+    // each factor, its weight, and the weighted contribution to the composite.
+    function renderScoreBreakdown(r, weights) {
+        const rows = [
+            ["Embedding", r.embedding_score, weights.embedding],
+            ["Texture (LBP)", r.texture_score, weights.texture],
+            ["Edge density", r.edge_score, weights.edge],
+            ["Color (HSV)", r.color_score, weights.color],
+            ["Dominant color", r.dominant_color_score, weights.dominant_color],
+        ];
+
+        const body = rows
+            .map(function (row) {
+                const name = row[0];
+                const sim = row[1] != null ? Number(row[1]) : null;
+                const w = row[2] != null ? Number(row[2]) : 0;
+                const contrib = sim != null ? sim * w : null;
+                const muted = w === 0 ? " muted" : "";
+                return (
+                    '<tr class="' + (muted ? "off" : "") + '">' +
+                    "<td>" + name + "</td>" +
+                    "<td>" + (sim != null ? sim.toFixed(3) : "—") + "</td>" +
+                    "<td>" + w.toFixed(2) + "</td>" +
+                    "<td>" + (contrib != null ? contrib.toFixed(3) : "—") + "</td>" +
+                    "</tr>"
+                );
+            })
+            .join("");
+
+        return (
+            '<div class="score-breakdown">' +
+            '<table class="score-table">' +
+            "<thead><tr><th>Factor</th><th>Sim</th><th>Wt</th><th>×</th></tr></thead>" +
+            "<tbody>" + body + "</tbody>" +
+            '<tfoot><tr><td>Composite</td><td colspan="2"></td><td>' +
+            Number(r.score).toFixed(3) + "</td></tr></tfoot>" +
+            "</table>" +
+            "</div>"
+        );
     }
 
     // ── Image viewer modal ────────────────────────────────────
