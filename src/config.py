@@ -48,6 +48,15 @@ MERGE_IOU_THRESHOLD = 0.30
 REGION_PADDING = 10
 TILE_FALLBACK_MIN_REGIONS = 1
 
+# ── Label-band trimming ───────────────────────────────────────
+# Catalog swatches often carry a solid horizontal label bar (e.g.
+# "D. NO. : 3-6315") at the top/bottom. That bar contaminates the crop and
+# hurts identity search. After a region is detected we trim contiguous
+# low-texture bands at the top/bottom edge, comparing each edge row's
+# texture against the region body so genuinely plain fabrics are left alone.
+TRIM_LABEL_BANDS = True
+LABEL_BAND_MAX_FRAC = 0.35  # never trim more than this fraction off either edge
+
 
 # ── Multi-pattern detection ───────────────────────────────────
 # When a tile's 4 quadrants have pairwise cosine similarity below

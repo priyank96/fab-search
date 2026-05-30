@@ -29,6 +29,7 @@ from src.config import (
     CATALOGS_DIR, PAGES_DIR, DPI,
     MIN_REGION_AREA_FRAC, MAX_REGION_AREA_FRAC,
     MORPH_KERNEL_SIZE, MERGE_IOU_THRESHOLD, REGION_PADDING,
+    TRIM_LABEL_BANDS, LABEL_BAND_MAX_FRAC,
     TILE_FALLBACK_MIN_REGIONS,
     TILE_SIZE, STRIDE, BLANK_THRESHOLD, WHITE_VALUE,
     SIMILARITY_THRESHOLD,
@@ -103,6 +104,8 @@ def index_single_pdf(pdf_path: str, store: PineconeStore, slow: bool = False) ->
             morph_kernel_size=MORPH_KERNEL_SIZE,
             merge_iou_threshold=MERGE_IOU_THRESHOLD,
             padding=REGION_PADDING,
+            trim_label_bands=TRIM_LABEL_BANDS,
+            label_band_max_frac=LABEL_BAND_MAX_FRAC,
         )
 
         if len(regions) < TILE_FALLBACK_MIN_REGIONS:

@@ -21,6 +21,8 @@ def _detect_regions_impl(
     morph_kernel_size: int = 15,
     merge_iou_threshold: float = 0.30,
     padding: int = 10,
+    trim_label_bands: bool = True,
+    label_band_max_frac: float = 0.35,
 ) -> tuple[list[tuple[int, int, int, int]], np.ndarray, np.ndarray]:
     """
     Internal implementation of contour-based region detection.
@@ -79,6 +81,15 @@ def _detect_regions_impl(
         w = min(page_w - x, w + 2 * padding)
         h = min(page_h - y, h + 2 * padding)
 
+        # Trim solid label bars / blank page margins at the top & bottom edges.
+        if trim_label_bands:
+            top_trim, bot_trim = _trim_label_bands(
+                gray[y : y + h, x : x + w], label_band_max_frac
+            )
+            if top_trim or bot_trim:
+                y += top_trim
+                h -= top_trim + bot_trim
+
         boxes.append((x, y, w, h))
 
     # 5. Merge overlapping boxes
@@ -96,6 +107,8 @@ def detect_regions(
     morph_kernel_size: int = 15,
     merge_iou_threshold: float = 0.30,
     padding: int = 10,
+    trim_label_bands: bool = True,
+    label_band_max_frac: float = 0.35,
 ) -> list[tuple[int, int, int, int]]:
     """
     Detect fabric pattern regions on a catalog page.
@@ -106,8 +119,70 @@ def detect_regions(
     boxes, _, _ = _detect_regions_impl(
         page_image, min_area_frac, max_area_frac,
         morph_kernel_size, merge_iou_threshold, padding,
+        trim_label_bands, label_band_max_frac,
     )
     return boxes
+
+
+def _trim_label_bands(
+    gray_crop: np.ndarray,
+    max_band_frac: float = 0.35,
+    ratio: float = 0.5,
+    min_body_std: float = 6.0,
+    min_band_px: int = 4,
+) -> tuple[int, int]:
+    """
+    Detect contiguous low-texture horizontal bands at the top/bottom edges of a
+    region crop and return the number of pixels to trim from each.
+
+    Catalog label bars (solid colour with a line of text) and blank page margins
+    have much lower per-row texture than the fabric body. We measure per-row
+    standard deviation as a texture proxy, smooth it to tolerate the thin text
+    line inside a bar, and trim edge rows whose texture stays well below the
+    region body's. Genuinely plain fabrics have a uniformly low profile, so the
+    body threshold is never crossed and nothing is trimmed.
+
+    Returns:
+        (top_trim, bottom_trim) in pixels.
+    """
+    h, w = gray_crop.shape[:2]
+    if h < 30 or w < 10:
+        return 0, 0
+
+    row_std = gray_crop.std(axis=1).astype(np.float32)
+
+    # Smooth so a sparse text line inside a solid bar doesn't break the band.
+    k = max(1, h // 50)
+    if k > 1:
+        kernel = np.ones(k, dtype=np.float32) / k
+        row_std = np.convolve(row_std, kernel, mode="same")
+
+    # Body texture = median of the central rows (immune to edge bars).
+    lo, hi = int(h * 0.30), int(h * 0.70)
+    body = float(np.median(row_std[lo:hi]))
+    if body < min_body_std:
+        return 0, 0  # essentially uniform region (plain fabric) — leave alone
+
+    thresh = body * ratio
+    max_band = int(h * max_band_frac)
+
+    top = 0
+    while top < max_band and row_std[top] < thresh:
+        top += 1
+    if top < min_band_px:
+        top = 0
+
+    bottom = 0
+    while bottom < max_band and row_std[h - 1 - bottom] < thresh:
+        bottom += 1
+    if bottom < min_band_px:
+        bottom = 0
+
+    # Safety: never collapse the region.
+    if top + bottom >= h - min_band_px:
+        return 0, 0
+
+    return top, bottom
 
 
 def _iou(box1, box2):
