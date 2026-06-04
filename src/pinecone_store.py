@@ -17,6 +17,7 @@ Pinecone metadata fields per vector:
     page_image   (str)  — URL or path to the rendered page image
 """
 
+import json
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -27,6 +28,13 @@ from pinecone import Pinecone
 from src.config import PINECONE_API_KEY, PINECONE_INDEX_NAME, EMBEDDING_DIM
 
 log = logging.getLogger(__name__)
+
+# Catalog manifest: a single cached record (separate namespace so it never
+# appears in search results) that holds the catalog list + counts. Lets the
+# web endpoint return the catalog list in one fetch instead of scanning the
+# entire index.
+MANIFEST_NAMESPACE = "__meta__"
+MANIFEST_ID = "catalog_manifest"
 
 
 def _get_pinecone_index():
@@ -234,35 +242,158 @@ class PineconeStore:
         # but practically the delete succeeds.
         return total_removed
 
-    def list_catalogs(self) -> list[dict]:
+    # ── Catalog manifest ──────────────────────────────────────
+    #
+    # Pinecone has no "list distinct metadata values" operation, so deriving
+    # the catalog list from the vectors means either a capped sample query
+    # (unreliable past 10k vectors) or a full ID pagination + metadata fetch
+    # over the whole index (accurate but slow). To keep the web endpoint fast,
+    # the catalog list + counts are cached in a single manifest record stored
+    # in a dedicated namespace. The expensive scan runs only to (re)build the
+    # manifest — never on the read path.
+
+    def write_manifest(self, catalogs: list[dict]) -> None:
+        """Persist the catalog list/counts to the manifest record."""
+        payload = json.dumps(catalogs, separators=(",", ":"))
+        # Pinecone rejects all-zero dense vectors, so use a non-zero
+        # placeholder. The values are irrelevant — this record lives in a
+        # dedicated namespace and is never used for similarity search.
+        placeholder = [1.0] + [0.0] * (EMBEDDING_DIM - 1)
+        self.index.upsert(
+            vectors=[{
+                "id": MANIFEST_ID,
+                "values": placeholder,
+                "metadata": {"catalogs": payload},
+            }],
+            namespace=MANIFEST_NAMESPACE,
+        )
+        log.info("write_manifest: stored %d catalog(s)", len(catalogs))
+
+    def read_manifest(self) -> list[dict] | None:
+        """Read the cached catalog list, or None if no manifest exists."""
+        try:
+            fetched = self.index.fetch(
+                ids=[MANIFEST_ID], namespace=MANIFEST_NAMESPACE
+            )
+        except Exception as e:
+            log.warning("read_manifest: fetch failed (%s)", e)
+            return None
+        vectors = getattr(fetched, "vectors", None)
+        if vectors is None and isinstance(fetched, dict):
+            vectors = fetched.get("vectors", {})
+        rec = (vectors or {}).get(MANIFEST_ID)
+        if rec is None:
+            return None
+        meta = getattr(rec, "metadata", None)
+        if meta is None and isinstance(rec, dict):
+            meta = rec.get("metadata")
+        if not meta or "catalogs" not in meta:
+            return None
+        try:
+            return json.loads(meta["catalogs"])
+        except (ValueError, TypeError) as e:
+            log.warning("read_manifest: corrupt manifest (%s)", e)
+            return None
+
+    def refresh_manifest(self) -> list[dict]:
+        """Rebuild the manifest from a full index scan and persist it."""
+        catalogs = self._scan_catalogs()
+        self.write_manifest(catalogs)
+        return catalogs
+
+    def manifest_upsert_catalog(
+        self, pdf_name: str, num_pages: int, num_vectors: int
+    ) -> None:
+        """Insert/update a single catalog entry in the manifest (no scan)."""
+        catalogs = self.read_manifest()
+        if catalogs is None:
+            # No manifest yet — build it from a scan (captures this catalog too).
+            self.refresh_manifest()
+            return
+        catalogs = [c for c in catalogs if c["pdf_name"] != pdf_name]
+        catalogs.append({
+            "pdf_name": pdf_name,
+            "num_pages": num_pages,
+            "num_vectors": num_vectors,
+        })
+        catalogs.sort(key=lambda c: c["pdf_name"])
+        self.write_manifest(catalogs)
+
+    def manifest_remove_catalog(self, pdf_name: str) -> None:
+        """Drop a catalog entry from the manifest (no scan)."""
+        catalogs = self.read_manifest()
+        if catalogs is None:
+            return
+        remaining = [c for c in catalogs if c["pdf_name"] != pdf_name]
+        if len(remaining) != len(catalogs):
+            self.write_manifest(remaining)
+
+    def list_catalogs(self, force_scan: bool = False) -> list[dict]:
         """
         List all indexed catalogs with page and vector counts.
 
-        Uses a dummy query to sample vectors and extract unique pdf_names.
-        For accurate counts on large indexes, consider maintaining a
-        separate metadata store or using Pinecone's list endpoint.
+        Reads the cached manifest in a single fetch. If the manifest is
+        missing (or ``force_scan=True``), performs a full index scan,
+        persists a fresh manifest, and returns it.
 
         Returns list of dicts with keys: pdf_name, num_pages, num_vectors.
         """
-        # Query with a zero vector to get a broad sample
-        dummy_vec = [0.0] * EMBEDDING_DIM
-        results = self.index.query(
-            vector=dummy_vec,
-            top_k=10000,
-            include_metadata=True,
-        )
+        if not force_scan:
+            cached = self.read_manifest()
+            if cached is not None:
+                return cached
+        return self.refresh_manifest()
 
+    def _scan_catalogs(self) -> list[dict]:
+        """
+        Enumerate every catalog via full ID pagination + metadata fetch.
+
+        Accurate regardless of index size, but expensive (touches the whole
+        index). Used only to (re)build the manifest. Falls back to a sampled
+        ``top_k=10000`` query if ID pagination is unavailable.
+        """
         catalog_stats: dict[str, dict[str, set | int]] = {}
 
-        for match in results.matches:
-            meta = match.metadata
+        def _record(meta: dict) -> None:
             name = meta["pdf_name"]
             if name not in catalog_stats:
                 catalog_stats[name] = {"pages": set(), "vectors": 0}
             catalog_stats[name]["pages"].add(meta["page_number"])
             catalog_stats[name]["vectors"] += 1
 
-        log.info("list_catalogs: found %d catalog(s): %s",
+        try:
+            for id_page in self.index.list():
+                ids = list(id_page) if id_page else []
+                for i in range(0, len(ids), 100):
+                    batch = ids[i : i + 100]
+                    if not batch:
+                        continue
+                    fetched = self.index.fetch(ids=batch)
+                    vectors = getattr(fetched, "vectors", None)
+                    if vectors is None and isinstance(fetched, dict):
+                        vectors = fetched.get("vectors", {})
+                    for vec in (vectors or {}).values():
+                        meta = getattr(vec, "metadata", None)
+                        if meta is None and isinstance(vec, dict):
+                            meta = vec.get("metadata")
+                        if meta:
+                            _record(meta)
+        except Exception as e:
+            log.warning(
+                "_scan_catalogs: ID pagination failed (%s); "
+                "falling back to sampled top_k=10000 query", e
+            )
+            catalog_stats = {}
+            dummy_vec = [0.0] * EMBEDDING_DIM
+            results = self.index.query(
+                vector=dummy_vec,
+                top_k=10000,
+                include_metadata=True,
+            )
+            for match in results.matches:
+                _record(match.metadata)
+
+        log.info("_scan_catalogs: found %d catalog(s): %s",
                  len(catalog_stats),
                  [name for name in sorted(catalog_stats.keys())])
 

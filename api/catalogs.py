@@ -52,6 +52,7 @@ async def manage_catalog(body: CatalogAction):
         deleted_blobs = delete_catalog_blobs(blob_urls)
     if has_vectors:
         store.remove_catalog(body.catalog_name)
+    store.manifest_remove_catalog(body.catalog_name)
 
     return {
         "message": f"Catalog '{body.catalog_name}' removed ({deleted_blobs} blobs deleted)",

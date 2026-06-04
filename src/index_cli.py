@@ -257,6 +257,9 @@ def cmd_add(args):
         _cleanup_pages_dir()
     elapsed = time.time() - t0
 
+    # Keep the cached catalog manifest in sync (cheap incremental update).
+    store.manifest_upsert_catalog(pdf_name, pages, vectors)
+
     print(f"\nDone in {elapsed:.1f}s")
     print(f"  Pages:   {pages}")
     print(f"  Regions: {regions}")
@@ -282,6 +285,7 @@ def cmd_remove(args):
 
     deleted_blobs = delete_catalog_blobs(blob_urls)
     store.remove_catalog(catalog_name)
+    store.manifest_remove_catalog(catalog_name)
     print(f"Removed '{catalog_name}' from index ({deleted_blobs} blobs deleted).")
 
 
@@ -327,6 +331,9 @@ def cmd_sync(args):
         store.close()
         _cleanup_pages_dir()
 
+    # Rebuild the cached catalog manifest from the authoritative index state.
+    store.refresh_manifest()
+
     elapsed = time.time() - pipeline_start
     print(f"\nSync complete in {elapsed:.1f}s")
     print(f"  New PDFs: {len(to_index)}")
@@ -345,8 +352,9 @@ def cmd_rebuild(args):
 
     store = PineconeStore()
 
-    # Remove all existing catalogs first
-    existing = store.list_catalogs()
+    # Remove all existing catalogs first (force a full scan so nothing is
+    # missed if the cached manifest is stale).
+    existing = store.list_catalogs(force_scan=True)
     for cat in existing:
         blob_urls = store.get_catalog_blob_urls(cat["pdf_name"])
         deleted_blobs = delete_catalog_blobs(blob_urls)
@@ -373,6 +381,9 @@ def cmd_rebuild(args):
     finally:
         store.close()
         _cleanup_pages_dir()
+
+    # Rebuild the cached catalog manifest from the authoritative index state.
+    store.refresh_manifest()
 
     elapsed = time.time() - pipeline_start
     print(f"\nIndexing complete in {elapsed:.1f}s")
