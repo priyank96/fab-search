@@ -68,11 +68,16 @@ TOP_K = 5
 
 # ── Re-ranking ────────────────────────────────────────────────
 # Number of raw tile matches to fetch from Pinecone before re-ranking.
+# (Metadata-only, cheap — does not download page images.)
 RERANK_FETCH_K = 50
-# How many top candidates get patch-level feature comparison. Set equal to
-# RERANK_FETCH_K to rerank every fetched candidate (slower: each candidate
-# triggers a tile-image download + LBP/edge/colour compute).
-RERANK_PATCH_CANDIDATES = 50
+# How many top candidates (by embedding score) get patch-level feature
+# comparison. Each one triggers a FULL-resolution page-image download +
+# decode, so this is the dominant memory cost of a search. Keep it well
+# below RERANK_FETCH_K: when a query matches a subset of catalogs poorly,
+# the fetched tiles dedup to many distinct pages, and downloading all of
+# them at once OOMs the serverless instance. We only return TOP_K results,
+# so re-ranking the top ~20 candidates is more than enough.
+RERANK_PATCH_CANDIDATES = 20
 # Feature weights (must sum to 1.0).
 # After finetuning, the embedding over-indexes on colour. Re-introduce the
 # colour-invariant hand-crafted signals (LBP texture + Canny edges) to

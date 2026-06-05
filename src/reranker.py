@@ -156,6 +156,9 @@ def _download_tile_image(
         resp.raise_for_status()
         img = Image.open(io.BytesIO(resp.content)).convert("RGB")
         cropped = img.crop((tile_x, tile_y, tile_x + tile_w, tile_y + tile_h))
+        # Release the full-resolution page buffer immediately — it's the
+        # largest allocation here and we only need the small crop downstream.
+        img.close()
         cropped.thumbnail((_THUMB, _THUMB), Image.LANCZOS)
         return cv2.cvtColor(np.asarray(cropped), cv2.COLOR_RGB2BGR)
     except Exception as e:
@@ -283,7 +286,7 @@ def rerank(
         )
 
     tile_images: dict[int, np.ndarray] = {}
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         futures = {pool.submit(_fetch, i): i for i in range(n_patch)}
         for future in as_completed(futures):
             idx, bgr = future.result()
